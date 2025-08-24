@@ -19,3 +19,28 @@ Button with gray background
 bg-gray-400/20 hover:bg-gray-400/50 text-white border rounded-xl hover:bg-gray-700 transition-colors font-semibold
 
 PANXTHER VARIABLES
+
+PROFILE
+ProfilePhoto
+
+FullName
+
+AgentType
+
+Description
+
+PhoneNumber
+
+EmailAddress
+
+Address
+
+LinkedIn
+
+Website
+
+Certificates (list of: Title, Issuer, Year)
+
+ProfileTheme
+
+Phone Number
