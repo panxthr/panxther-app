@@ -125,7 +125,7 @@ function ProfileDashboard({ darkMode = true, setDarkMode = () => {}, setDashboar
   };
 
   return (
-    <div className={`transition-colors duration-300 ${darkMode ? 'text-white' : 'text-gray-900'}`}>
+    <div className={`transition-colors pb-40 duration-300 ${darkMode ? 'text-white' : 'text-gray-900'}`}>
       {/* Mobile menu button */}
       <div className="lg:hidden">
         <button
@@ -153,28 +153,33 @@ function ProfileDashboard({ darkMode = true, setDarkMode = () => {}, setDashboar
                 darkMode ? 'bg-gray-200/5 border-gray-700' : 'bg-white/30 border-gray-200'
               } backdrop-blur-md rounded-2xl border p-6`}>
 
-                <h2 className="text-xl font-semibold mb-4 flex items-center">
-                  <Camera size={24} className="mr-2" />
-                  Profile Photo
-                </h2>
-                <div className="flex items-center space-x-6">
+                
+                <div className="flex items-center justify-between">
+                  <div>
+                    <h2 className="text-xl font-semibold mb-4 flex items-center">
+                      <Camera size={24} className="mr-2 " />
+                      Profile Photo
+                    </h2>
+                    <p className={`text-lg ${darkMode ? 'text-gray-400' : 'text-gray-600'} mb-2`}>
+                      Upload a professional photo to build trust with clients
+                    </p>
+                 
+                  </div>
+
                   <div className="relative">
                     <div className="w-24 h-24 bg-gradient-to-br from-blue-400 to-purple-500 rounded-full flex items-center justify-center text-white text-2xl font-bold">
                       {profileData.name.split(' ').map(n => n[0]).join('')}
                     </div>
-                    <button className={`absolute -bottom-2 -right-2 p-2 ${darkMode ? 'bg-gray-700 hover:bg-gray-600' : 'bg-gray-100 hover:bg-gray-200'} rounded-full transition-colors`}>
+                    <button
+                      className={`absolute -bottom-2 -right-2 p-2 ${
+                        darkMode ? 'bg-gray-700 hover:bg-gray-600' : 'bg-gray-100 hover:bg-gray-200'
+                      } rounded-full transition-colors`}
+                    >
                       <Camera size={16} />
                     </button>
                   </div>
-                  <div>
-                    <p className={`text-sm ${darkMode ? 'text-gray-400' : 'text-gray-600'} mb-2`}>
-                      Upload a professional photo to build trust with clients
-                    </p>
-                    <button className="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors">
-                      Change Photo
-                    </button>
-                  </div>
                 </div>
+
               </div>
 
               {/* Basic Information */}
@@ -294,7 +299,7 @@ function ProfileDashboard({ darkMode = true, setDarkMode = () => {}, setDashboar
                   </h2>
                   <button
                     onClick={addLink}
-                    className="flex items-center px-3 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors"
+                    className="flex items-center rounded-lg text-gray-400 hover:text-yellow-100 hover:scale-105 transition-transform transition-colors duration-300"
                   >
                     <Plus size={16} className="mr-1" />
                     Add Link
@@ -330,7 +335,7 @@ function ProfileDashboard({ darkMode = true, setDarkMode = () => {}, setDashboar
                       <button
                         onClick={() => removeLink(index)}
                         className={`p-2 rounded-lg transition-colors ${
-                          darkMode ? 'hover:bg-gray-700 text-red-400' : 'hover:bg-gray-100 text-red-500'
+                          darkMode ? 'hover:text-red-400 text-gray-400' : 'hover: text-red-500'
                         }`}
                       >
                         <X size={16} />
@@ -351,7 +356,7 @@ function ProfileDashboard({ darkMode = true, setDarkMode = () => {}, setDashboar
                   </h2>
                   <button
                     onClick={addCertificate}
-                    className="flex items-center px-3 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors"
+                    className="flex items-center rounded-lg text-gray-400 hover:text-yellow-100 hover:scale-105 transition-transform transition-colors duration-300"
                   >
                     <Plus size={16} className="mr-1" />
                     Add Certificate
@@ -398,7 +403,7 @@ function ProfileDashboard({ darkMode = true, setDarkMode = () => {}, setDashboar
                       <button
                         onClick={() => removeCertificate(index)}
                         className={`p-2 rounded-lg transition-colors ${
-                          darkMode ? 'hover:bg-gray-700 text-red-400' : 'hover:bg-gray-100 text-red-500'
+                          darkMode ? 'hover:text-red-400 text-gray-400' : 'hover:bg-gray-100 text-red-500'
                         }`}
                       >
                         <X size={16} />
@@ -435,10 +440,10 @@ function ProfileDashboard({ darkMode = true, setDarkMode = () => {}, setDashboar
               </div>
 
               {/* Save Button */}
-              <div className="flex justify-end pt-6">
+              <div className="flex justify-end">
                 <button
                   onClick={handleSave}
-                  className="flex items-center px-8 py-4 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors font-semibold text-lg shadow-lg hover:shadow-xl"
+                  className="flex items-center px-6 py-3 bg-green-500/20 border border-green-400 text-green-400 rounded-lg hover:bg-green-500/50 hover:text-green-300 transition-colors font-semibold duration-300"
                 >
                   <Save size={20} className="mr-2" />
                   Save Profile

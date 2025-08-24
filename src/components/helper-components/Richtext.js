@@ -17,6 +17,8 @@ import {
 
 const RichTextEditor = ({ initialContent = '', onChange = () => {}, placeholder = 'Start writing...' }) => {
   const editorRef = useRef(null);
+  const imageInputRef = useRef(null);
+  const videoInputRef = useRef(null);
   const [isInitialized, setIsInitialized] = useState(false);
 
   useEffect(() => {
@@ -41,41 +43,110 @@ const RichTextEditor = ({ initialContent = '', onChange = () => {}, placeholder 
     }
   };
 
-  const insertImage = () => {
-    const url = prompt('Enter image URL:');
-    if (url) {
-      handleCommand('insertImage', url);
+  const handleImageUpload = (event) => {
+    const file = event.target.files[0];
+    if (file && file.type.startsWith('image/')) {
+      const reader = new FileReader();
+      reader.onload = (e) => {
+        // Create a temporary image to check dimensions
+        const tempImg = document.createElement('img');
+        tempImg.onload = () => {
+          // Create canvas for resizing if needed
+          const canvas = document.createElement('canvas');
+          const ctx = canvas.getContext('2d');
+          
+          // Set maximum dimensions
+          const MAX_WIDTH = 800;
+          const MAX_HEIGHT = 600;
+          
+          let { width, height } = tempImg;
+          
+          // Calculate new dimensions if image is too large
+          if (width > MAX_WIDTH || height > MAX_HEIGHT) {
+            const ratio = Math.min(MAX_WIDTH / width, MAX_HEIGHT / height);
+            width = width * ratio;
+            height = height * ratio;
+          }
+          
+          // Set canvas dimensions and draw resized image
+          canvas.width = width;
+          canvas.height = height;
+          ctx.drawImage(tempImg, 0, 0, width, height);
+          
+          // Create final image element
+          const img = document.createElement('img');
+          img.src = canvas.toDataURL('image/jpeg', 0.8); // 80% quality
+          img.style.maxWidth = '100%';
+          img.style.height = 'auto';
+          img.style.margin = '10px auto';
+          img.style.display = 'block';
+          img.style.borderRadius = '4px';
+          img.style.boxShadow = '0 2px 4px rgba(0,0,0,0.1)';
+          
+          // Insert the image at cursor position
+          const selection = window.getSelection();
+          if (selection.rangeCount > 0) {
+            const range = selection.getRangeAt(0);
+            range.insertNode(img);
+            range.setStartAfter(img);
+            range.collapse(true);
+            selection.removeAllRanges();
+            selection.addRange(range);
+          } else {
+            editorRef.current.appendChild(img);
+          }
+          
+          handleContentChange();
+          editorRef.current.focus();
+        };
+        tempImg.src = e.target.result;
+      };
+      reader.readAsDataURL(file);
     }
+    // Reset input value to allow same file to be selected again
+    event.target.value = '';
+  };
+
+  const handleVideoUpload = (event) => {
+    const file = event.target.files[0];
+    if (file && file.type.startsWith('video/')) {
+      const reader = new FileReader();
+      reader.onload = (e) => {
+        const video = document.createElement('video');
+        video.src = e.target.result;
+        video.controls = true;
+        video.style.maxWidth = '100%';
+        video.style.height = 'auto';
+        video.style.margin = '10px 0';
+        
+        // Insert the video at cursor position
+        const selection = window.getSelection();
+        if (selection.rangeCount > 0) {
+          const range = selection.getRangeAt(0);
+          range.insertNode(video);
+          range.setStartAfter(video);
+          range.collapse(true);
+          selection.removeAllRanges();
+          selection.addRange(range);
+        } else {
+          editorRef.current.appendChild(video);
+        }
+        
+        handleContentChange();
+        editorRef.current.focus();
+      };
+      reader.readAsDataURL(file);
+    }
+    // Reset input value to allow same file to be selected again
+    event.target.value = '';
+  };
+
+  const insertImage = () => {
+    imageInputRef.current?.click();
   };
 
   const insertVideo = () => {
-    const url = prompt('Enter video URL (YouTube, Vimeo, or direct video URL):');
-    if (url) {
-      let embedCode = '';
-      
-      // YouTube
-      if (url.includes('youtube.com') || url.includes('youtu.be')) {
-        const videoId = url.includes('youtu.be') 
-          ? url.split('/').pop().split('?')[0]
-          : url.split('v=')[1]?.split('&')[0];
-        if (videoId) {
-          embedCode = `<iframe width="560" height="315" src="https://www.youtube.com/embed/${videoId}" frameborder="0" allowfullscreen></iframe>`;
-        }
-      }
-      // Vimeo
-      else if (url.includes('vimeo.com')) {
-        const videoId = url.split('/').pop();
-        embedCode = `<iframe src="https://player.vimeo.com/video/${videoId}" width="560" height="315" frameborder="0" allowfullscreen></iframe>`;
-      }
-      // Direct video URL
-      else {
-        embedCode = `<video controls width="560" height="315"><source src="${url}" type="video/mp4">Your browser does not support the video tag.</video>`;
-      }
-
-      if (embedCode) {
-        handleCommand('insertHTML', embedCode);
-      }
-    }
+    videoInputRef.current?.click();
   };
 
   const insertLink = () => {
@@ -175,7 +246,23 @@ const RichTextEditor = ({ initialContent = '', onChange = () => {}, placeholder 
   };
 
   return (
-    <div className="w-full  mx-auto bg-white border border-gray-300 rounded-lg shadow-sm">
+    <div className="w-full mx-auto mb-20 bg-white border border-gray-300 rounded-lg shadow-sm">
+      {/* Hidden file inputs */}
+      <input
+        ref={imageInputRef}
+        type="file"
+        accept="image/*"
+        onChange={handleImageUpload}
+        style={{ display: 'none' }}
+      />
+      <input
+        ref={videoInputRef}
+        type="file"
+        accept="video/*"
+        onChange={handleVideoUpload}
+        style={{ display: 'none' }}
+      />
+
       {/* Toolbar */}
       <div className="flex flex-wrap items-center gap-1 p-3 border-b border-gray-200 bg-gray-50">
         {/* Text Formatting */}
@@ -221,10 +308,10 @@ const RichTextEditor = ({ initialContent = '', onChange = () => {}, placeholder 
 
         {/* Media & Links */}
         <div className="flex items-center gap-1">
-          <ToolbarButton onClick={insertImage} title="Insert Image">
+          <ToolbarButton onClick={insertImage} title="Upload Image">
             <Image size={18} />
           </ToolbarButton>
-          <ToolbarButton onClick={insertVideo} title="Insert Video">
+          <ToolbarButton onClick={insertVideo} title="Upload Video">
             <Video size={18} />
           </ToolbarButton>
           <ToolbarButton onClick={insertLink} title="Insert Link">
@@ -237,7 +324,7 @@ const RichTextEditor = ({ initialContent = '', onChange = () => {}, placeholder 
       <div
         ref={editorRef}
         contentEditable
-        className="min-h-96 p-4 outline-none focus:ring-2 focus:ring-blue-500 focus:ring-inset"
+        className="h-[920px] p-4 outline-none overflow-y-auto"
         style={{ 
           wordWrap: 'break-word',
           overflowWrap: 'break-word'
@@ -297,7 +384,8 @@ const RichTextEditor = ({ initialContent = '', onChange = () => {}, placeholder 
         [contenteditable] img {
           max-width: 100%;
           height: auto;
-          margin: 10px 0;
+          margin: 10px auto;
+          display: block;
         }
         
         [contenteditable] iframe {

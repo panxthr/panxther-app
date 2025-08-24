@@ -296,10 +296,10 @@ const BlogConfig = () => {
         <div className="text-center py-12">
           <FileText className="w-16 h-16 text-gray-300 mx-auto mb-4" />
           <p className="text-gray-500 text-lg">No posts found</p>
-          <p className="text-gray-400 mb-6">Try adjusting your search or filters</p>
+          <p className="text-gray-500 mb-6">Try adjusting your search or filters</p>
           <button
             onClick={createNewPost}
-            className="px-4 py-2 bg-gradient-to-r from-sky-500 to-indigo-500 text-white rounded-lg"
+            className="px-4 py-2 bg-gradient-to-r text-white rounded-lg hover:scale-105 hover:text-yellow-400 transition-transform duration-300"
           >
             Create your first post
           </button>
@@ -331,14 +331,17 @@ const BlogConfig = () => {
         <div className="flex items-center gap-3">
           <button
             onClick={() => savePost('draft')}
-            className="px-6 py-2 bg-gray-600 hover:bg-gray-700 text-white rounded-lg flex items-center gap-2 transition-colors"
+            className="px-6 py-2 bg-green-500/20 border border-green-400 text-green-400 rounded-lg hover:bg-green-500/50 hover:text-green-300 transition-colors font-semibold duration-300 rounded-lg flex items-center gap-2 transition-colors duration-300"
           >
             <Save className="w-4 h-4" />
             Save Draft
           </button>
           <button
             onClick={() => savePost('published')}
-            className="px-6 py-2 bg-gradient-to-r from-sky-500 to-indigo-500 text-white rounded-lg hover:opacity-95 flex items-center gap-2"
+            className="px-6 py-2 
+            rounded-lg flex items-center gap-2 bg-yellow-500/20 border border-yellow-400 text-yellow-400 font-semibold rounded-lg hover:bg-yellow-500/50 hover:text-yellow-300 transition-colors duration-300"
+
+
           >
             <Upload className="w-4 h-4" />
             Publish
@@ -387,7 +390,7 @@ const BlogConfig = () => {
         </div>
 
         {/* Rich Text Editor */}
-        <div className="bg-white/60 backdrop-blur-sm rounded-xl border border-white/20 overflow-hidden">
+        <div className="backdrop-blur-sm rounded-xl  overflow-hidden">
           <RichTextEditor 
             initialContent={editorContent}
             onChange={setEditorContent}

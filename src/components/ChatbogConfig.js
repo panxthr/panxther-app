@@ -1,11 +1,146 @@
 import { useState } from "react";
-import { Bot, User, HelpCircle, Book, Settings, Plus, X, Save, Power, MessageSquare, ArrowRight, ArrowDown, Trash2, Edit3, Info } from "lucide-react";
+import { Bot, User, HelpCircle, Book, Settings, Plus, X, Save, Power, MessageSquare, ArrowRight, ArrowDown, Trash2, Edit3, Info ,MessageCircle, Mail, TrendingUp} from "lucide-react";
 
 
 
 function ChatbotConfig({ darkMode = true }) {
+
+  
+
+  
+  const [faqCurrentPage, setFaqCurrentPage] = useState(1);
+
+
+  const ITEMS_PER_PAGE = 5;
+  const [currentPage, setCurrentPage] = useState(1);
+
+    const [wikiEntries, setWikiEntries] = useState([
+    {
+      id: 1,
+      title: "Auto Insurance Basics",
+      content: "Auto insurance provides financial protection against physical damage or bodily injury resulting from traffic collisions. Required minimums vary by state.",
+      tags: ["auto", "basics", "required"]
+    },
+    {
+      id: 2,
+      title: "Home Insurance Coverage Types",
+      content: "Home insurance typically includes dwelling coverage, personal property protection, liability coverage, and additional living expenses coverage.",
+      tags: ["home", "coverage", "protection"]
+    }
+  ]);
+  
+  // Calculate pagination
+  const totalPages = Math.ceil(wikiEntries.length / ITEMS_PER_PAGE);
+  const startIndex = (currentPage - 1) * ITEMS_PER_PAGE;
+  const endIndex = startIndex + ITEMS_PER_PAGE;
+  const currentEntries = wikiEntries.slice(startIndex, endIndex);
+
+  const goToNextPage = () => {
+    if (currentPage < totalPages) {
+      setCurrentPage(currentPage + 1);
+    }
+  };
+
+  const goToPrevPage = () => {
+    if (currentPage > 1) {
+      setCurrentPage(currentPage - 1);
+    }
+  };
+
+  const goToPage = (page) => {
+    setCurrentPage(page);
+  };
+
+
   const [chatbotEnabled, setChatbotEnabled] = useState(true);
   const [activeTab, setActiveTab] = useState('guide');
+  const [selectedMode, setSelectedMode] = useState('FAQ');
+
+  const modes = {
+    FAQ: {
+      icon: HelpCircle,
+      title: 'FAQ Mode',
+      description: 'Automatically responds to user queries with predefined answers',
+      features: [
+        'Instant responses to common questions',
+        'Knowledge base integration',
+        'Self-service support',
+        'Reduces support workload'
+      ],
+      color: 'blue'
+    },
+    SALES: {
+      icon: TrendingUp,
+      title: 'Sales Mode',
+      description: 'Captures leads and sends them directly to your inbox and email',
+      features: [
+        'Lead capture and qualification',
+        'Email notifications for new leads',
+        'Contact information collection',
+        'CRM integration ready'
+      ],
+      color: 'green'
+    }
+  };
+
+  const renderModeCard = (modeKey, mode) => {
+    const Icon = mode.icon;
+    const isSelected = selectedMode === modeKey;
+    
+    return (
+      <div
+        key={modeKey}
+        onClick={() => setSelectedMode(modeKey)}
+        className={`
+          relative p-6 rounded-xl border-2 cursor-pointer transition-all duration-300
+          ${isSelected 
+            ? `border-${mode.color}-500 ${darkMode ? 'bg-zinc-800' : 'bg-white'} shadow-lg` 
+            : `${darkMode ? 'border-gray-600 bg-zinc-900 hover:border-gray-500' : 'border-gray-200 bg-gray-50 hover:border-gray-300'}`
+          }
+        `}
+      >
+        {isSelected && (
+          <div className={`absolute top-4 right-4 w-4 h-4 rounded-full bg-${mode.color}-500`}>
+            <div className="w-2 h-2 bg-white rounded-full absolute top-1 left-1"></div>
+          </div>
+        )}
+        
+        <div className="flex items-start space-x-4">
+          <div className={`
+            p-3 rounded-lg 
+            ${isSelected 
+              ? `bg-${mode.color}-100 text-${mode.color}-600` 
+              : `${darkMode ? 'bg-gray-700 text-gray-300' : 'bg-gray-200 text-gray-600'}`
+            }
+          `}>
+            <Icon size={24} />
+          </div>
+          
+          <div className="flex-1">
+            <h3 className={`text-lg font-semibold mb-2 ${darkMode ? 'text-white' : 'text-gray-900'}`}>
+              {mode.title}
+            </h3>
+            <p className={`text-sm mb-4 ${darkMode ? 'text-gray-400' : 'text-gray-600'}`}>
+              {mode.description}
+            </p>
+            
+            <ul className="space-y-2">
+              {mode.features.map((feature, index) => (
+                <li key={index} className="flex items-center text-sm">
+                  <div className={`w-1.5 h-1.5 rounded-full mr-3 ${
+                    isSelected ? `bg-${mode.color}-500` : `${darkMode ? 'bg-gray-600' : 'bg-gray-400'}`
+                  }`}></div>
+                  <span className={darkMode ? 'text-gray-300' : 'text-gray-700'}>
+                    {feature}
+                  </span>
+                </li>
+              ))}
+            </ul>
+          </div>
+        </div>
+      </div>
+    );
+  };
   
   // User Guide State
   const [userInfo, setUserInfo] = useState({
@@ -37,20 +172,7 @@ function ChatbotConfig({ darkMode = true }) {
   ]);
 
   // Wiki/Context State
-  const [wikiEntries, setWikiEntries] = useState([
-    {
-      id: 1,
-      title: "Auto Insurance Basics",
-      content: "Auto insurance provides financial protection against physical damage or bodily injury resulting from traffic collisions. Required minimums vary by state.",
-      tags: ["auto", "basics", "required"]
-    },
-    {
-      id: 2,
-      title: "Home Insurance Coverage Types",
-      content: "Home insurance typically includes dwelling coverage, personal property protection, liability coverage, and additional living expenses coverage.",
-      tags: ["home", "coverage", "protection"]
-    }
-  ]);
+
 
   // Chatbot Behavior Flow State
   const [behaviorFlow, setBehaviorFlow] = useState([
@@ -81,7 +203,7 @@ function ChatbotConfig({ darkMode = true }) {
     { id: 'guide', label: 'User Guide', icon: User },
     { id: 'faq', label: 'FAQ Management', icon: HelpCircle },
     { id: 'wiki', label: 'Context Wiki', icon: Book },
-    { id: 'behavior', label: 'Behavior Flow', icon: Settings }
+    { id: 'behavior', label: 'Behaviour', icon: Settings }
   ];
 
   // FAQ Functions
@@ -226,6 +348,37 @@ function ChatbotConfig({ darkMode = true }) {
     </div>
   );
 
+  const FAQ_ITEMS_PER_PAGE = 10;
+  
+  // Ensure faqs is initialized
+  if (!faqs) {
+    return <div>Loading...</div>;
+  }
+
+
+  // Calculate pagination
+  const faqTotalPages = Math.ceil(faqs.length / FAQ_ITEMS_PER_PAGE);
+  const faqStartIndex = (faqCurrentPage - 1) * FAQ_ITEMS_PER_PAGE;
+  const faqEndIndex = faqStartIndex + FAQ_ITEMS_PER_PAGE;
+  const currentFaqEntries = faqs.slice(faqStartIndex, faqEndIndex);
+
+  const goToNextFaqPage = () => {
+    if (faqCurrentPage < faqTotalPages) {
+      setFaqCurrentPage(faqCurrentPage + 1);
+    }
+  };
+
+  const goToPrevFaqPage = () => {
+    if (faqCurrentPage > 1) {
+      setFaqCurrentPage(faqCurrentPage - 1);
+    }
+  };
+
+  const goToFaqPage = (page) => {
+    setFaqCurrentPage(page);
+  };    
+
+
   const renderFaqManagement = () => (
     <div className="space-y-6">
       <div className="flex items-center justify-between">
@@ -237,32 +390,66 @@ function ChatbotConfig({ darkMode = true }) {
         </div>
         <button
           onClick={addFaq}
-          className="flex items-center  text-white-100 hover:text-yellow-400  text-white rounded-lg  transition-colors"
+          className="flex items-center text-white-100 hover:text-yellow-400 text-white rounded-lg transition-colors"
         >
           <Plus size={16} className="mr-2" />
           Add FAQ
         </button>
       </div>
 
+      {/* Pagination Info */}
+      {faqs.length > 0 && (
+        <div className={`text-sm ${darkMode ? 'text-gray-400' : 'text-gray-600'}`}>
+          Showing {faqStartIndex + 1}-{Math.min(faqEndIndex, faqs.length)} of {faqs.length} FAQs
+        </div>
+      )}
+
       <div className="space-y-4">
-        {faqs.map((faq) => (
+        {currentFaqEntries.map((faq) => (
           <div key={faq.id} className={`${
-            darkMode ? ' ' : 'bg-white border-gray-200'
+            darkMode ? '' : 'bg-white border-gray-200'
           } rounded-xl pt-6`}>
             <div className="flex items-start justify-between mb-4">
               <div className="flex items-center">
-                <MessageSquare size={20} className="mr-2 text-blue-500" />
-                <h4 className="font-medium">FAQ #{faq.id}</h4>
+                <h4 className="font-medium">FAQ</h4>
               </div>
-              <button
-                onClick={() => removeFaq(faq.id)}
-                className={`p-2 rounded-lg transition-colors ${
-                  darkMode ? 'hover:text-red-400 text-white-400' : 'hover:bg-gray-100 text-red-500'
-                }`}
-              >
-                <X size={16} />
-              </button>
+              <div className="flex items-center space-x-3">
+                {/* Onboarded Only Switch */}
+                <div className="flex items-center space-x-2">
+                  <span className={`text-xs font-medium ${
+                    darkMode ? 'text-gray-400' : 'text-gray-600'
+                  }`}>
+                    Onboarded Only
+                  </span>
+                  <button
+                    onClick={() => updateFaq(faq.id, 'onboardedOnly', !faq.onboardedOnly)}
+                    className={`relative inline-flex h-5 w-9 items-center rounded-full transition-colors ${
+                      faq.onboardedOnly
+                        ? 'bg-blue-600'
+                        : darkMode
+                        ? 'bg-gray-600'
+                        : 'bg-gray-300'
+                    }`}
+                  >
+                    <span
+                      className={`inline-block h-3 w-3 transform rounded-full bg-white transition-transform ${
+                        faq.onboardedOnly ? 'translate-x-5' : 'translate-x-1'
+                      }`}
+                    />
+                  </button>
+                </div>
+                
+                <button
+                  onClick={() => removeFaq(faq.id)}
+                  className={`p-2 rounded-lg transition-colors ${
+                    darkMode ? 'hover:text-red-400 text-white-400' : 'hover:bg-gray-100 text-red-500'
+                  }`}
+                >
+                  <X size={16} />
+                </button>
+              </div>
             </div>
+            
             <div className="space-y-4">
               <div>
                 <label className="block text-sm font-medium mb-2">Question</label>
@@ -273,9 +460,9 @@ function ChatbotConfig({ darkMode = true }) {
                   placeholder="Enter the question customers might ask..."
                   className={`w-full px-4 py-3 rounded-lg border transition-colors ${
                     darkMode 
-                      ? 'bg-zinc-900/50 border-gray-600 ' 
+                      ? 'bg-zinc-900/50 border-gray-600' 
                       : 'bg-gray-50 border-gray-200'
-                  } focus:outline-none focus:ring-2  focus:ring-opacity-20`}
+                  } focus:outline-none focus:ring-2 focus:ring-opacity-20`}
                 />
               </div>
               <div>
@@ -287,8 +474,8 @@ function ChatbotConfig({ darkMode = true }) {
                   placeholder="Enter the response the chatbot should give..."
                   className={`w-full px-4 py-3 rounded-lg border transition-colors ${
                     darkMode 
-                      ? 'bg-zinc-900/50 border-gray-600 ' 
-                      : 'bg-gray-50 border-gray-200 '
+                      ? 'bg-zinc-900/50 border-gray-600' 
+                      : 'bg-gray-50 border-gray-200'
                   } focus:outline-none focus:ring-2 focus:ring-opacity-20`}
                 />
               </div>
@@ -296,6 +483,80 @@ function ChatbotConfig({ darkMode = true }) {
           </div>
         ))}
       </div>
+
+      {/* Pagination Controls */}
+      {faqTotalPages > 1 && (
+        <div className="flex items-center justify-between pt-6">
+          <div className="flex items-center space-x-2">
+            <button
+              onClick={goToPrevFaqPage}
+              disabled={faqCurrentPage === 1}
+              className={`px-3 py-2 rounded-lg text-sm font-medium transition-colors ${
+                faqCurrentPage === 1
+                  ? darkMode
+                    ? 'bg-gray-800 text-gray-500 cursor-not-allowed'
+                    : 'bg-gray-100 text-gray-400 cursor-not-allowed'
+                  : darkMode
+                  ? 'bg-gray-700 text-white hover:bg-gray-600'
+                  : 'bg-white text-gray-700 hover:bg-gray-50 border border-gray-300'
+              }`}
+            >
+              Previous
+            </button>
+            
+            <div className="flex items-center space-x-1">
+              {[...Array(faqTotalPages)].map((_, index) => {
+                const page = index + 1;
+                const isActive = page === faqCurrentPage;
+                
+                return (
+                  <button
+                    key={page}
+                    onClick={() => goToFaqPage(page)}
+                    className={`px-3 py-2 rounded-lg text-sm font-medium transition-colors ${
+                      isActive
+                        ? 'bg-blue-600 text-white'
+                        : darkMode
+                        ? 'text-gray-300 hover:bg-gray-700'
+                        : 'text-gray-700 hover:bg-gray-100'
+                    }`}
+                  >
+                    {page}
+                  </button>
+                );
+              })}
+            </div>
+            
+            <button
+              onClick={goToNextFaqPage}
+              disabled={faqCurrentPage === faqTotalPages}
+              className={`px-3 py-2 rounded-lg text-sm font-medium transition-colors ${
+                faqCurrentPage === faqTotalPages
+                  ? darkMode
+                    ? 'bg-gray-800 text-gray-500 cursor-not-allowed'
+                    : 'bg-gray-100 text-gray-400 cursor-not-allowed'
+                  : darkMode
+                  ? 'bg-gray-700 text-white hover:bg-gray-600'
+                  : 'bg-white text-gray-700 hover:bg-gray-50 border border-gray-300'
+              }`}
+            >
+              Next
+            </button>
+          </div>
+          
+          <div className={`text-sm ${darkMode ? 'text-gray-400' : 'text-gray-600'}`}>
+            Page {faqCurrentPage} of {faqTotalPages}
+          </div>
+        </div>
+      )}
+
+      {/* Empty State */}
+      {faqs.length === 0 && (
+        <div className={`text-center py-12 ${darkMode ? 'text-gray-400' : 'text-gray-500'}`}>
+          <div className="text-lg mb-2">No FAQs yet</div>
+          <div className="text-sm">Click "Add FAQ" to create your first frequently asked question</div>
+        </div>
+      )}
     </div>
   );
 
@@ -310,32 +571,66 @@ function ChatbotConfig({ darkMode = true }) {
         </div>
         <button
           onClick={addWikiEntry}
-          className="flex items-center py-2  text-white rounded-lg hover:text-yellow-400 transition-colors"
+          className="flex items-center py-2 text-white rounded-lg hover:text-yellow-400 transition-colors"
         >
           <Plus size={16} className="mr-2" />
           Add Entry
         </button>
       </div>
 
+      {/* Pagination Info */}
+      {wikiEntries.length > 0 && (
+        <div className={`text-sm ${darkMode ? 'text-gray-400' : 'text-gray-600'}`}>
+          Showing {startIndex + 1}-{Math.min(endIndex, wikiEntries.length)} of {wikiEntries.length} entries
+        </div>
+      )}
+
       <div className="space-y-4">
-        {wikiEntries.map((entry) => (
+        {currentEntries.map((entry) => (
           <div key={entry.id} className={`${
-            darkMode ? ' border-gray-600' : ' border-gray-200'
+            darkMode ? 'border-gray-600' : 'border-gray-200'
           } pt-12`}>
             <div className="flex items-start justify-between mb-4">
               <div className="flex items-center">
-                <Book size={20} className="mr-2 text-green-500" />
                 <h4 className="font-medium">Knowledge Entry</h4>
               </div>
-              <button
-                onClick={() => removeWikiEntry(entry.id)}
-                className={`p-2 rounded-lg transition-colors ${
-                  darkMode ? 'hover:text-red-400 text-white' : 'hover:bg-gray-100 text-red-500'
-                }`}
-              >
-                <X size={16} />
-              </button>
+              <div className="flex items-center space-x-3">
+                {/* Onboarded Only Switch */}
+                <div className="flex items-center space-x-2">
+                  <span className={`text-xs font-medium ${
+                    darkMode ? 'text-gray-400' : 'text-gray-600'
+                  }`}>
+                    Onboarded Only
+                  </span>
+                  <button
+                    onClick={() => updateWikiEntry(entry.id, 'onboardedOnly', !entry.onboardedOnly)}
+                    className={`relative inline-flex h-5 w-9 items-center rounded-full transition-colors ${
+                      entry.onboardedOnly
+                        ? 'bg-blue-600'
+                        : darkMode
+                        ? 'bg-gray-600'
+                        : 'bg-gray-300'
+                    }`}
+                  >
+                    <span
+                      className={`inline-block h-3 w-3 transform rounded-full bg-white transition-transform ${
+                        entry.onboardedOnly ? 'translate-x-5' : 'translate-x-1'
+                      }`}
+                    />
+                  </button>
+                </div>
+                
+                <button
+                  onClick={() => removeWikiEntry(entry.id)}
+                  className={`p-2 rounded-lg transition-colors ${
+                    darkMode ? 'hover:text-red-400 text-white' : 'hover:bg-gray-100 text-red-500'
+                  }`}
+                >
+                  <X size={16} />
+                </button>
+              </div>
             </div>
+            
             <div className="space-y-4">
               <div>
                 <label className="block text-sm font-medium mb-2">Title</label>
@@ -346,9 +641,9 @@ function ChatbotConfig({ darkMode = true }) {
                   placeholder="Enter a descriptive title..."
                   className={`w-full px-4 py-3 rounded-lg border transition-colors ${
                     darkMode 
-                      ? 'bg-zinc-900/50 border-gray-600 ' 
+                      ? 'bg-zinc-900/50 border-gray-600' 
                       : 'bg-gray-50 border-gray-200'
-                  } focus:outline-none focus:ring-2  focus:ring-opacity-20`}
+                  } focus:outline-none focus:ring-2 focus:ring-opacity-20`}
                 />
               </div>
               <div>
@@ -360,9 +655,9 @@ function ChatbotConfig({ darkMode = true }) {
                   placeholder="Enter detailed information about this topic..."
                   className={`w-full px-4 py-3 rounded-lg border transition-colors ${
                     darkMode 
-                      ? 'bg-zinc-900/50 border-gray-600 ' 
-                      : 'bg-gray-50 border-gray-200 '
-                  } focus:outline-none focus:ring-2  focus:ring-opacity-20`}
+                      ? 'bg-zinc-900/50 border-gray-600' 
+                      : 'bg-gray-50 border-gray-200'
+                  } focus:outline-none focus:ring-2 focus:ring-opacity-20`}
                 />
               </div>
               <div>
@@ -375,7 +670,7 @@ function ChatbotConfig({ darkMode = true }) {
                   className={`w-full px-4 py-3 rounded-lg border transition-colors ${
                     darkMode 
                       ? 'bg-zinc-900/50 border-gray-600' 
-                      : 'bg-gray-50 border-gray-200 '
+                      : 'bg-gray-50 border-gray-200'
                   } focus:outline-none focus:ring-2 focus:ring-opacity-20`}
                 />
               </div>
@@ -383,112 +678,194 @@ function ChatbotConfig({ darkMode = true }) {
           </div>
         ))}
       </div>
+
+      {/* Pagination Controls */}
+      {totalPages > 1 && (
+        <div className="flex items-center justify-between pt-6">
+          <div className="flex items-center space-x-2">
+            <button
+              onClick={goToPrevPage}
+              disabled={currentPage === 1}
+              className={`px-3 py-2 rounded-lg text-sm font-medium transition-colors ${
+                currentPage === 1
+                  ? darkMode
+                    ? 'bg-gray-800 text-gray-500 cursor-not-allowed'
+                    : 'bg-gray-100 text-gray-400 cursor-not-allowed'
+                  : darkMode
+                  ? 'bg-gray-700 text-white hover:bg-gray-600'
+                  : 'bg-white text-gray-700 hover:bg-gray-50 border border-gray-300'
+              }`}
+            >
+              Previous
+            </button>
+            
+            <div className="flex items-center space-x-1">
+              {[...Array(totalPages)].map((_, index) => {
+                const page = index + 1;
+                const isActive = page === currentPage;
+                
+                return (
+                  <button
+                    key={page}
+                    onClick={() => goToPage(page)}
+                    className={`px-3 py-2 rounded-lg text-sm font-medium transition-colors ${
+                      isActive
+                        ? 'bg-blue-600 text-white'
+                        : darkMode
+                        ? 'text-gray-300 hover:bg-gray-700'
+                        : 'text-gray-700 hover:bg-gray-100'
+                    }`}
+                  >
+                    {page}
+                  </button>
+                );
+              })}
+            </div>
+            
+            <button
+              onClick={goToNextPage}
+              disabled={currentPage === totalPages}
+              className={`px-3 py-2 rounded-lg text-sm font-medium transition-colors ${
+                currentPage === totalPages
+                  ? darkMode
+                    ? 'bg-gray-800 text-gray-500 cursor-not-allowed'
+                    : 'bg-gray-100 text-gray-400 cursor-not-allowed'
+                  : darkMode
+                  ? 'bg-gray-700 text-white hover:bg-gray-600'
+                  : 'bg-white text-gray-700 hover:bg-gray-50 border border-gray-300'
+              }`}
+            >
+              Next
+            </button>
+          </div>
+          
+          <div className={`text-sm ${darkMode ? 'text-gray-400' : 'text-gray-600'}`}>
+            Page {currentPage} of {totalPages}
+          </div>
+        </div>
+      )}
+
+      {/* Empty State */}
+      {wikiEntries.length === 0 && (
+        <div className={`text-center py-12 ${darkMode ? 'text-gray-400' : 'text-gray-500'}`}>
+          <div className="text-lg mb-2">No knowledge entries yet</div>
+          <div className="text-sm">Click "Add Entry" to create your first knowledge base entry</div>
+        </div>
+      )}
     </div>
   );
 
   const renderBehaviorFlow = () => (
-    <div className="space-y-6">
-      <div className="flex items-center justify-between">
-        <div>
-          <h3 className="text-lg font-semibold">Chatbot Behavior Flow</h3>
-          <p className={`text-sm ${darkMode ? 'text-gray-400' : 'text-gray-600'} mt-1`}>
-            Define how your chatbot responds to different situations and user inputs
-          </p>
-        </div>
-        <button
-          onClick={addBehaviorRule}
-          className="flex items-center px-4 py-2  text-white rounded-lg hover:text-yellow-400 transition-colors"
-        >
-          <Plus size={16} className="mr-2" />
-          Add Rule
-        </button>
-      </div>
-
-      <div className="space-y-4">
-        {behaviorFlow.map((rule, index) => (
-          <div key={rule.id} className={`${
-            darkMode ? '-border-gray-600' : 'bg-white border-gray-200'
-          } rounded-xl pt-8`}>
-            <div className="flex items-start justify-between mb-4">
-              <div className="flex items-center">
-                <Settings size={20} className="mr-2 text-yellow-00" />
-                <h4 className="font-medium">Rule #{index + 1}</h4>
-              </div>
-              <button
-                onClick={() => removeBehaviorRule(rule.id)}
-                className={`p-2 rounded-lg transition-colors ${
-                  darkMode ? 'hover:text-red-400 text-white' : 'hover:bg-gray-100 text-red-500'
-                }`}
-              >
-                <X size={16} />
-              </button>
-            </div>
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-4">
-              <div>
-                <label className="block text-sm font-medium mb-2">Trigger Name</label>
-                <input
-                  type="text"
-                  value={rule.trigger}
-                  onChange={(e) => updateBehaviorRule(rule.id, 'trigger', e.target.value)}
-                  placeholder="e.g., greeting, quote_request"
-                  className={`w-full px-4 py-3 rounded-lg border transition-colors ${
-                    darkMode 
-                      ? 'bg-zinc-900 border-gray-600' 
-                      : 'bg-gray-50 border-gray-200 '
-                  } focus:outline-none focus:ring-2  focus:ring-opacity-20`}
-                />
-              </div>
-              <div>
-                <label className="block text-sm font-medium mb-2">Condition</label>
-                <input
-                  type="text"
-                  value={rule.condition}
-                  onChange={(e) => updateBehaviorRule(rule.id, 'condition', e.target.value)}
-                  placeholder="When should this trigger activate?"
-                  className={`w-full px-4 py-3 rounded-lg border transition-colors ${
-                    darkMode 
-                      ? 'bg-zinc-900 border-gray-600 ' 
-                      : 'bg-gray-50 border-gray-200'
-                  } focus:outline-none focus:ring-2  focus:ring-opacity-20`}
-                />
-              </div>
-            </div>
-            <div className="mb-4">
-              <label className="block text-sm font-medium mb-2">Response</label>
-              <textarea
-                value={rule.response}
-                onChange={(e) => updateBehaviorRule(rule.id, 'response', e.target.value)}
-                rows={3}
-                placeholder="What should the chatbot say?"
-                className={`w-full px-4 py-3 rounded-lg border transition-colors ${
-                  darkMode 
-                    ? 'bg-zinc-900 border-gray-600 ' 
-                    : 'bg-gray-50 border-gray-200 '
-                } focus:outline-none focus:ring-2  focus:ring-opacity-20`}
-              />
-            </div>
-            <div>
-              <label className="block text-sm font-medium mb-2">Next Actions (comma-separated)</label>
-              <input
-                type="text"
-                value={rule.nextActions.join(', ')}
-                onChange={(e) => updateBehaviorRule(rule.id, 'nextActions', e.target.value.split(',').map(action => action.trim()))}
-                placeholder="ask_for_details, schedule_call, provide_info"
-                className={`w-full px-4 py-3 rounded-lg border transition-colors ${
-                  darkMode 
-                    ? 'bg-zinc-900 border-gray-600' 
-                    : 'bg-gray-50 border-gray-200'
-                } focus:outline-none focus:ring-2  focus:ring-opacity-20`}
-              />
-            </div>
+    <div className={` ${darkMode ? ' text-white' : 'bg-gray-50 text-gray-900'}`}>
+      <div className=" mx-auto">
+        {/* Header */}
+        <div className="flex items-center justify-between mb-8">
+          <div>
+            <h1 className="text-lg text-justify font-bold mb-2">Chatbot Configuration</h1>
+            <p className={`${darkMode ? 'text-gray-400 text-sm' : 'text-gray-600'}`}>
+              Choose how you want your chatbot to handle user interactions. Information provided from the FAQ Management and Context Wiki will be used to inform the chatbot's responses.
+            </p>
           </div>
-        ))}
+
+        </div>
+
+        {/* Mode Selection */}
+        <div className="space-y-6 mb-8">
+          <h2 className="text-lg font-semibold">Select Chatbot Mode</h2>
+          <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+            {Object.entries(modes).map(([modeKey, mode]) => 
+              renderModeCard(modeKey, mode)
+            )}
+          </div>
+        </div>
+
+        {/* Configuration Panel */}
+        <div className={`p-6 rounded-xl ${darkMode ? 'bg-zinc-900 border border-gray-700' : 'bg-white border border-gray-200'}`}>
+          <h3 className="text-lg font-semibold mb-4">
+            {modes[selectedMode].title} Configuration
+          </h3>
+          
+          {selectedMode === 'FAQ' && (
+            <div className="space-y-4">
+              <div>
+                <label className="block text-sm font-medium mb-2">Knowledge Base Source</label>
+                <select className={`w-full px-4 py-3 rounded-lg border transition-colors ${
+                  darkMode 
+                    ? 'bg-zinc-800 border-gray-600 text-white' 
+                    : 'bg-gray-50 border-gray-300 text-gray-900'
+                } focus:outline-none focus:ring-2 focus:ring-blue-500`}>
+                  <option>Upload Documents</option>
+                  <option>Website Scraping</option>
+                  <option>Manual Entry</option>
+                  <option>API Integration</option>
+                </select>
+              </div>
+              
+              <div>
+                <label className="block text-sm font-medium mb-2">Default Response</label>
+                <textarea
+                  rows={3}
+                  placeholder="What should the bot say when it doesn't know the answer?"
+                  className={`w-full px-4 py-3 rounded-lg border transition-colors ${
+                    darkMode 
+                      ? 'bg-zinc-800 border-gray-600 text-white' 
+                      : 'bg-gray-50 border-gray-300 text-gray-900'
+                  } focus:outline-none focus:ring-2 focus:ring-blue-500`}
+                />
+              </div>
+            </div>
+          )}
+
+          {selectedMode === 'SALES' && (
+            <div className="space-y-4">
+              <div>
+                <label className="block text-sm font-medium mb-2">Email Address for Leads</label>
+                <input
+                  type="email"
+                  placeholder="sales@company.com"
+                  className={`w-full px-4 py-3 rounded-lg border transition-colors ${
+                    darkMode 
+                      ? 'bg-zinc-800 border-gray-600 text-white' 
+                      : 'bg-gray-50 border-gray-300 text-gray-900'
+                  } focus:outline-none focus:ring-2 focus:ring-green-500`}
+                />
+              </div>
+              
+              <div>
+                <label className="block text-sm font-medium mb-2">Lead Qualification Questions</label>
+                <textarea
+                  rows={4}
+                  placeholder="What questions should the bot ask to qualify leads? (e.g., company size, budget, timeline)"
+                  className={`w-full px-4 py-3 rounded-lg border transition-colors ${
+                    darkMode 
+                      ? 'bg-zinc-800 border-gray-600 text-white' 
+                      : 'bg-gray-50 border-gray-300 text-gray-900'
+                  } focus:outline-none focus:ring-2 focus:ring-green-500`}
+                />
+              </div>
+              
+              <div>
+                <label className="block text-sm font-medium mb-2">Thank You Message</label>
+                <textarea
+                  rows={2}
+                  placeholder="Thank you for your interest! Our team will contact you within 24 hours."
+                  className={`w-full px-4 py-3 rounded-lg border transition-colors ${
+                    darkMode 
+                      ? 'bg-zinc-800 border-gray-600 text-white' 
+                      : 'bg-gray-50 border-gray-300 text-gray-900'
+                  } focus:outline-none focus:ring-2 focus:ring-green-500`}
+                />
+              </div>
+            </div>
+          )}
+        </div>
+
       </div>
     </div>
   );
 
   return (
-    <div className={`min-h-screen transition-colors duration-300 ${darkMode ? 'text-white' : 'bg-gray-50 text-gray-900'}`}>
+    <div className={`min-h-screen pb-40 transition-colors duration-300 ${darkMode ? 'text-white' : 'bg-gray-50 text-gray-900'}`}>
       <div className="max-w-6xl mx-auto ">
         {/* Header with Enable/Disable Toggle */}
         <div className="mb-20">
@@ -573,7 +950,7 @@ function ChatbotConfig({ darkMode = true }) {
         <div className="flex justify-end">
           <button
             onClick={handleSave}
-            className="flex items-center px-8 py-4 bg-blue-600 text-white rounded-xl hover:bg-blue-700 transition-colors font-semibold text-lg shadow-lg hover:shadow-xl"
+            className="flex items-center px-6 py-3 bg-green-500/20 border border-green-400 text-green-400 rounded-lg hover:bg-green-500/50 hover:text-green-300 transition-colors font-semibold duration-300"
           >
             <Save size={20} className="mr-2" />
             Save Configuration

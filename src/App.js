@@ -3,6 +3,7 @@ import Navbar from "./components/Navbar";
 import ProfileDashboard from "./components/ProfileDashboard";
 import ChatbotConfig from "./components/ChatbogConfig";
 import BlogConfig from "./components/BlogConfig";
+import NewsletterCondfig from "./components/NewsletterConfig";
 import "./App.css";
 import { ShaderGradientCanvas, ShaderGradient } from "@shadergradient/react";
 
@@ -57,10 +58,7 @@ export default function App() {
         );
       case "newsletter":
         return (
-          <div className="text-center py-12">
-            <h2 className="text-2xl font-bold text-gray-100">Newsletter Page</h2>
-            <p className="text-gray-400 mt-2">Newsletter content goes here</p>
-          </div>
+          <NewsletterCondfig />
         );
       case "settings":
         return (
