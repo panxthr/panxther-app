@@ -1,0 +1,803 @@
+import React, { useState, useEffect } from 'react';
+import { useParams } from 'react-router-dom';
+import { doc, getDoc, collection, getDocs, query, orderBy, where } from 'firebase/firestore';
+import { db } from './firebase'; // Adjust the import path as needed
+import Chatbot from './user-components/Chatbot'; 
+
+const ProfilePage = () => {
+  const [messages, setMessages] = useState([]); // New state for chatbot messages
+  const { userId } = useParams(); // Extract userId from URL parameters
+  const [profileData, setProfileData] = useState(null);
+  const [blogs, setBlogs] = useState([]);
+  const [chatbotConfig, setChatbotConfig] = useState(null);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState(null);
+  const [dataLoadingStatus, setDataLoadingStatus] = useState({
+    profile: 'loading',
+    blogs: 'loading',
+    chatbot: 'loading'
+  });
+  
+  // New state for floating action buttons
+  const [showChatbot, setShowChatbot] = useState(false);
+  const [showEnquiryEmail, setShowEnquiryEmail] = useState(false);
+
+  useEffect(() => {
+    const fetchAllData = async () => {
+      try {
+        const actualUserId = userId;
+        
+        // Update loading status
+        setDataLoadingStatus({
+          profile: 'loading',
+          blogs: 'loading',
+          chatbot: 'loading'
+        });
+
+        // Fetch profile data
+        try {
+          const profileDocRef = doc(db, 'Users', actualUserId);
+          const profileDocSnap = await getDoc(profileDocRef);
+          
+          if (!profileDocSnap.exists()) {
+            setError('User not found');
+            return;
+          }
+
+          const userData = profileDocSnap.data();
+          const profileData = userData.profile;
+          
+          if (profileData) {
+            setProfileData(profileData);
+            setDataLoadingStatus(prev => ({ ...prev, profile: 'success' }));
+            console.log('Profile data loaded:', profileData);
+          } else {
+            setError('Profile data not found');
+            return;
+          }
+        } catch (profileError) {
+          console.error('Error fetching profile:', profileError);
+          setDataLoadingStatus(prev => ({ ...prev, profile: 'error' }));
+          setError('Error loading profile');
+          return;
+        }
+
+        // Fetch blogs with better error handling
+        try {
+          const blogsCollectionRef = collection(db, 'Users', actualUserId, 'Blogs');
+          
+          // Try different query approaches
+          let blogsData = [];
+          try {
+            // First, try with the full query
+            const blogsQuery = query(
+              blogsCollectionRef, 
+              where('status', '==', 'published'),
+              orderBy('createdAt', 'desc')
+            );
+            const blogsSnapshot = await getDocs(blogsQuery);
+            blogsData = blogsSnapshot.docs.map(doc => ({
+              id: doc.id,
+              ...doc.data()
+            }));
+          } catch (queryError) {
+            console.log('Complex query failed, trying simple query:', queryError);
+            // Fallback: try without the where clause
+            try {
+              const simpleBlogsQuery = query(blogsCollectionRef, orderBy('createdAt', 'desc'));
+              const blogsSnapshot = await getDocs(simpleBlogsQuery);
+              blogsData = blogsSnapshot.docs
+                .map(doc => ({
+                  id: doc.id,
+                  ...doc.data()
+                }))
+                .filter(blog => blog.status === 'published'); // Filter in memory
+            } catch (simpleQueryError) {
+              console.log('Simple query failed, trying basic collection read:', simpleQueryError);
+              // Last resort: just get all documents
+              const blogsSnapshot = await getDocs(blogsCollectionRef);
+              blogsData = blogsSnapshot.docs
+                .map(doc => ({
+                  id: doc.id,
+                  ...doc.data()
+                }))
+                .filter(blog => blog.status === 'published')
+                .sort((a, b) => {
+                  if (a.createdAt && b.createdAt) {
+                    return b.createdAt.toDate() - a.createdAt.toDate();
+                  }
+                  return 0;
+                });
+            }
+          }
+          
+          setBlogs(blogsData);
+          setDataLoadingStatus(prev => ({ ...prev, blogs: 'success' }));
+          console.log('Blogs loaded:', blogsData);
+        } catch (blogError) {
+          console.error('Error fetching blogs:', blogError);
+          setDataLoadingStatus(prev => ({ ...prev, blogs: 'error' }));
+          // Don't set main error for blogs, just log it
+          setBlogs([]); // Set empty array as fallback
+        }
+
+        // Fetch chatbot config with better error handling
+        try {
+          const chatbotConfigRef = doc(db, 'Users', actualUserId, 'chatbot', 'config');
+          const chatbotConfigSnap = await getDoc(chatbotConfigRef);
+          
+          if (chatbotConfigSnap.exists()) {
+            setChatbotConfig(chatbotConfigSnap.data());
+            setDataLoadingStatus(prev => ({ ...prev, chatbot: 'success' }));
+            console.log('Chatbot config loaded:', chatbotConfigSnap.data());
+          } else {
+            setDataLoadingStatus(prev => ({ ...prev, chatbot: 'not_found' }));
+            console.log('Chatbot config not found');
+          }
+        } catch (chatbotError) {
+          console.error('Error fetching chatbot config:', chatbotError);
+          setDataLoadingStatus(prev => ({ ...prev, chatbot: 'error' }));
+          // Don't set main error for chatbot config, just log it
+        }
+
+      } catch (err) {
+        console.error('Error fetching data:', err);
+        setError('Error loading profile');
+      } finally {
+        setLoading(false);
+      }
+    };
+
+    if (userId) {
+      fetchAllData();
+    }
+  }, [userId]);
+
+  const getThemeStyles = (theme) => {
+    switch (theme) {
+      case 'elegant':
+        return {
+          background: 'bg-gradient-to-br from-slate-50 via-gray-50 to-slate-100',
+          card: 'bg-white/90 backdrop-blur-md border border-slate-300/50 shadow-xl',
+          text: 'text-slate-800',
+          accent: 'text-slate-600',
+          button: 'bg-slate-700 hover:bg-slate-800 text-white shadow-lg hover:shadow-xl',
+          secondary: 'bg-slate-100 hover:bg-slate-200 text-slate-700',
+          fab: 'bg-slate-700 hover:bg-slate-800'
+        };
+      case 'casual':
+        return {
+          background: 'bg-gradient-to-br from-blue-50 via-sky-50 to-indigo-100',
+          card: 'bg-white/85 backdrop-blur-md border border-blue-300/40 shadow-lg',
+          text: 'text-blue-900',
+          accent: 'text-blue-600',
+          button: 'bg-blue-600 hover:bg-blue-700 text-white shadow-lg hover:shadow-xl',
+          secondary: 'bg-blue-100 hover:bg-blue-200 text-blue-700',
+          fab: 'bg-blue-600 hover:bg-blue-700'
+        };
+      case 'professional':
+        return {
+          background: 'bg-gradient-to-br from-gray-900 via-slate-900 to-gray-800',
+          card: 'bg-white/15 backdrop-blur-lg border border-gray-600/50 shadow-2xl',
+          text: 'text-gray-100',
+          accent: 'text-gray-300',
+          button: 'bg-gray-700 hover:bg-gray-600 text-white shadow-lg hover:shadow-xl',
+          secondary: 'bg-gray-800 hover:bg-gray-700 text-gray-200',
+          fab: 'bg-gray-700 hover:bg-gray-600'
+        };
+      case 'modern':
+        return {
+          background: 'bg-gradient-to-br from-purple-50 via-pink-50 to-rose-100',
+          card: 'bg-white/85 backdrop-blur-md border border-purple-300/40 shadow-lg',
+          text: 'text-purple-900',
+          accent: 'text-pink-600',
+          button: 'bg-gradient-to-r from-purple-600 to-pink-600 hover:from-purple-700 hover:to-pink-700 text-white shadow-lg hover:shadow-xl',
+          secondary: 'bg-purple-100 hover:bg-purple-200 text-purple-700',
+          fab: 'bg-gradient-to-r from-purple-600 to-pink-600 hover:from-purple-700 hover:to-pink-700'
+        };
+      case 'vibrant':
+        return {
+          background: 'bg-gradient-to-br from-orange-50 via-red-50 to-pink-100',
+          card: 'bg-white/85 backdrop-blur-md border border-orange-300/40 shadow-lg',
+          text: 'text-red-900',
+          accent: 'text-orange-600',
+          button: 'bg-gradient-to-r from-orange-600 to-red-600 hover:from-orange-700 hover:to-red-700 text-white shadow-lg hover:shadow-xl',
+          secondary: 'bg-orange-100 hover:bg-orange-200 text-orange-700',
+          fab: 'bg-gradient-to-r from-orange-600 to-red-600 hover:from-orange-700 hover:to-red-700'
+        };
+      case 'minimal':
+        return {
+          background: 'bg-gradient-to-br from-green-50 via-emerald-50 to-teal-100',
+          card: 'bg-white/80 backdrop-blur-sm border border-green-300/30 shadow-md',
+          text: 'text-green-900',
+          accent: 'text-emerald-600',
+          button: 'bg-emerald-600 hover:bg-emerald-700 text-white shadow-md hover:shadow-lg',
+          secondary: 'bg-emerald-100 hover:bg-emerald-200 text-emerald-700',
+          fab: 'bg-emerald-600 hover:bg-emerald-700'
+        };
+      default: // fallback to elegant
+        return {
+          background: 'bg-gradient-to-br from-slate-50 via-gray-50 to-slate-100',
+          card: 'bg-white/90 backdrop-blur-md border border-slate-300/50 shadow-xl',
+          text: 'text-slate-800',
+          accent: 'text-slate-600',
+          button: 'bg-slate-700 hover:bg-slate-800 text-white shadow-lg hover:shadow-xl',
+          secondary: 'bg-slate-100 hover:bg-slate-200 text-slate-700',
+          fab: 'bg-slate-700 hover:bg-slate-800'
+        };
+    }
+  };
+
+  const handleEnquiryEmail = () => {
+    if (profileData?.email) {
+      const subject = encodeURIComponent(`Enquiry about ${profileData.firstName || 'your services'}`);
+      const body = encodeURIComponent(`Hi ${profileData.firstName || ''},\n\nI would like to enquire about...\n\nBest regards`);
+      window.open(`mailto:${profileData.email}?subject=${subject}&body=${body}`, '_blank');
+    } else {
+      setShowEnquiryEmail(true);
+    }
+  };
+
+  if (loading) {
+    return (
+      <div className="min-h-screen bg-gradient-to-br from-slate-50 to-slate-100 flex items-center justify-center">
+        <div className="text-center">
+          <div className="text-slate-800 text-xl font-sans mb-4">Loading profile...</div>
+          <div className="flex justify-center space-x-4 text-sm text-slate-600">
+            <span className={`px-2 py-1 rounded ${dataLoadingStatus.profile === 'success' ? 'bg-green-100' : 'bg-gray-100'}`}>
+              Profile: {dataLoadingStatus.profile}
+            </span>
+            <span className={`px-2 py-1 rounded ${dataLoadingStatus.blogs === 'success' ? 'bg-green-100' : 'bg-gray-100'}`}>
+              Blogs: {dataLoadingStatus.blogs}
+            </span>
+            <span className={`px-2 py-1 rounded ${dataLoadingStatus.chatbot === 'success' ? 'bg-green-100' : 'bg-gray-100'}`}>
+              Chatbot: {dataLoadingStatus.chatbot}
+            </span>
+          </div>
+        </div>
+      </div>
+    );
+  }
+
+  if (error) {
+    return (
+      <div className="min-h-screen bg-gradient-to-br from-slate-50 to-slate-100 flex items-center justify-center">
+        <div className="text-center">
+          <div className="text-red-600 text-xl font-sans mb-4">{error}</div>
+          <button 
+            onClick={() => window.location.reload()} 
+            className="bg-slate-700 hover:bg-slate-800 text-white px-4 py-2 rounded-lg"
+          >
+            Retry
+          </button>
+        </div>
+      </div>
+    );
+  }
+
+  if (!profileData) {
+    return (
+      <div className="min-h-screen bg-gradient-to-br from-slate-50 to-slate-100 flex items-center justify-center">
+        <div className="text-slate-800 text-xl font-sans">Profile not found</div>
+      </div>
+    );
+  }
+
+  const theme = getThemeStyles(profileData.theme);
+  const fullName = `${profileData.firstName || ''} ${profileData.lastName || ''}`.trim();
+
+  return (
+    <div className={`min-h-screen ${theme.background} font-['Poppins'] relative overflow-hidden`}>
+      {/* Background Effects - Enhanced geometric patterns */}
+      <div className="absolute inset-0">
+        <div className="absolute top-10 right-10 w-72 h-72 bg-gradient-to-br from-blue-400/20 to-purple-400/20 rounded-full blur-3xl animate-pulse"></div>
+        <div className="absolute bottom-20 left-20 w-96 h-96 bg-gradient-to-br from-pink-400/15 to-orange-400/15 rounded-full blur-3xl animate-pulse" style={{animationDelay: '1s'}}></div>
+        <div className="absolute top-1/2 left-1/2 transform -translate-x-1/2 -translate-y-1/2 w-64 h-64 bg-gradient-to-br from-emerald-400/10 to-teal-400/10 rounded-full blur-3xl animate-pulse" style={{animationDelay: '2s'}}></div>
+        
+        {/* Subtle geometric shapes */}
+        <div className="absolute top-1/4 right-1/3 w-2 h-2 bg-current opacity-10 rounded-full"></div>
+        <div className="absolute bottom-1/3 left-1/4 w-1 h-1 bg-current opacity-20 rounded-full"></div>
+        <div className="absolute top-2/3 right-1/4 w-1.5 h-1.5 bg-current opacity-15 rounded-full"></div>
+      </div>
+
+      {/* Content */}
+      <div className="relative z-10 container mx-auto px-6 py-12">
+        <div className="max-w-4xl mx-auto">
+          {/* Debug Info (remove in production) */}
+          {process.env.NODE_ENV === 'development' && (
+            <div className="mb-4 p-4 bg-gray-100 rounded-lg text-sm">
+              <strong>Debug Info:</strong>
+              <div>Profile: {dataLoadingStatus.profile}</div>
+              <div>Blogs: {dataLoadingStatus.blogs} ({blogs.length} loaded)</div>
+              <div>Chatbot: {dataLoadingStatus.chatbot}</div>
+            </div>
+          )}
+
+          {/* Header Section */}
+          <div className={`${theme.card} rounded-3xl p-10 mb-8 text-center relative overflow-hidden animate-fade-in`}>
+            {/* Subtle pattern overlay */}
+            <div className="absolute inset-0 opacity-5">
+              <div className="absolute inset-0" style={{backgroundImage: 'radial-gradient(circle at 2px 2px, currentColor 1px, transparent 0)', backgroundSize: '24px 24px'}}></div>
+            </div>
+            
+            {/* Profile Photo */}
+            <div className="mb-8 relative">
+              {profileData.profilePicture ? (
+                <div className="relative">
+                  <img
+                    src={profileData.profilePicture}
+                    alt={fullName}
+                    className="w-36 h-36 rounded-full mx-auto object-cover border-4 border-white/60 shadow-2xl"
+                  />
+                  <div className="absolute inset-0 w-36 h-36 mx-auto rounded-full border-2 border-white/30 animate-pulse"></div>
+                </div>
+              ) : (
+                <div className="relative">
+                  <div className="w-36 h-36 rounded-full mx-auto bg-gradient-to-br from-orange-400 to-orange-600 flex items-center justify-center border-4 border-white/60 shadow-2xl">
+                    <span className="text-5xl font-bold text-white">
+                      {fullName.charAt(0).toUpperCase() || 'U'}
+                    </span>
+                  </div>
+                  <div className="absolute inset-0 w-36 h-36 mx-auto rounded-full border-2 border-white/30 animate-pulse"></div>
+                </div>
+              )}
+            </div>
+
+            {/* Name and Title */}
+            <div className="relative z-10">
+              {fullName && (
+                <h1 className={`text-5xl font-bold ${theme.text} mb-3 tracking-tight`}>
+                  {fullName}
+                </h1>
+              )}
+              
+              {profileData.agentType && (
+                <div className={`inline-flex items-center px-4 py-2 ${theme.secondary} rounded-full mb-4`}>
+                  <span className={`text-lg font-medium ${theme.accent}`}>
+                    {profileData.agentType}
+                  </span>
+                </div>
+              )}
+
+              {profileData.occupation && (
+                <p className={`text-xl ${theme.accent} mb-6 font-medium`}>
+                  {profileData.occupation}
+                </p>
+              )}
+              
+              {/* Bio/Description */}
+              {profileData.bio && (
+                <p className={`${theme.text} opacity-80 max-w-2xl mx-auto leading-relaxed text-lg`}>
+                  {profileData.bio}
+                </p>
+              )}
+            </div>
+          </div>
+
+          {/* Contact Information */}
+          {(profileData.email || profileData.phone || profileData.address) && (
+            <div className={`${theme.card} rounded-3xl p-8 mb-8 animate-slide-up`} style={{animationDelay: '0.1s'}}>
+              <h2 className={`text-3xl font-bold ${theme.text} mb-8 text-center`}>
+                Contact Information
+              </h2>
+              <div className="grid md:grid-cols-3 gap-8">
+                {profileData.email && (
+                  <div className="text-center group">
+                    <div className={`w-16 h-16 ${theme.button} rounded-2xl flex items-center justify-center mx-auto mb-4 transition-all duration-300 group-hover:scale-110`}>
+                      <svg className="w-8 h-8 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 8l7.89 4.26a2 2 0 002.22 0L21 8M5 19h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2z" />
+                      </svg>
+                    </div>
+                    <p className={`${theme.text} font-semibold text-lg mb-2`}>Email</p>
+                    <a 
+                      href={`mailto:${profileData.email}`}
+                      className={`${theme.accent} hover:underline transition-colors duration-200 font-medium`}
+                    >
+                      {profileData.email}
+                    </a>
+                  </div>
+                )}
+
+                {profileData.phone && (
+                  <div className="text-center group">
+                    <div className={`w-16 h-16 ${theme.button} rounded-2xl flex items-center justify-center mx-auto mb-4 transition-all duration-300 group-hover:scale-110`}>
+                      <svg className="w-8 h-8 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 5a2 2 0 012-2h3.28a1 1 0 01.948.684l1.498 4.493a1 1 0 01-.502 1.21l-2.257 1.13a11.042 11.042 0 005.516 5.516l1.13-2.257a1 1 0 011.21-.502l4.493 1.498a1 1 0 01.684.949V19a2 2 0 01-2 2h-1C9.716 21 3 14.284 3 6V5z" />
+                      </svg>
+                    </div>
+                    <p className={`${theme.text} font-semibold text-lg mb-2`}>Phone</p>
+                    <a 
+                      href={`tel:${profileData.phone}`}
+                      className={`${theme.accent} hover:underline transition-colors duration-200 font-medium`}
+                    >
+                      {profileData.phone}
+                    </a>
+                  </div>
+                )}
+
+                {profileData.address && (
+                  <div className="text-center group">
+                    <div className={`w-16 h-16 ${theme.button} rounded-2xl flex items-center justify-center mx-auto mb-4 transition-all duration-300 group-hover:scale-110`}>
+                      <svg className="w-8 h-8 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17.657 16.657L13.414 20.9a1.998 1.998 0 01-2.827 0l-4.244-4.243a8 8 0 1111.314 0z" />
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 11a3 3 0 11-6 0 3 3 0 016 0z" />
+                      </svg>
+                    </div>
+                    <p className={`${theme.text} font-semibold text-lg mb-2`}>Location</p>
+                    <p className={`${theme.text} opacity-80 font-medium`}>
+                      {profileData.address}
+                    </p>
+                  </div>
+                )}
+              </div>
+            </div>
+          )}
+
+          {/* Links Section */}
+          {profileData.links && profileData.links.some(link => link.url && link.url.trim() !== '') && (
+            <div className={`${theme.card} rounded-2xl p-8 mb-8 animate-slide-up`} style={{animationDelay: '0.2s'}}>
+              <h2 className={`text-2xl font-bold ${theme.text} mb-6 text-center`}>
+                Links
+              </h2>
+              <div className="grid md:grid-cols-2 gap-4">
+                {profileData.links
+                  .filter(link => link.url && link.url.trim() !== '')
+                  .map((link, index) => (
+                    <a
+                      key={index}
+                      href={link.url.startsWith('http') ? link.url : `https://${link.url}`}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className={`${theme.button} px-6 py-4 rounded-xl text-center font-medium transition-all duration-300 transform hover:scale-105 hover:shadow-lg`}
+                    >
+                      {link.label && link.label.trim() !== '' ? link.label : link.url}
+                    </a>
+                  ))}
+              </div>
+            </div>
+          )}
+
+          {/* Website Section */}
+          {profileData.website && profileData.website.trim() !== '' && (
+            <div className={`${theme.card} rounded-2xl p-8 mb-8 animate-slide-up`} style={{animationDelay: '0.3s'}}>
+              <h2 className={`text-2xl font-bold ${theme.text} mb-6 text-center`}>
+                Website
+              </h2>
+              <div className="text-center">
+                <a
+                  href={profileData.website.startsWith('http') ? profileData.website : `https://${profileData.website}`}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className={`${theme.button} px-8 py-4 rounded-xl font-medium transition-all duration-300 transform hover:scale-105 hover:shadow-lg inline-block`}
+                >
+                  Visit Website
+                </a>
+              </div>
+            </div>
+          )}
+
+          {/* Social Media Section */}
+          {profileData.socialMedia?.linkedin && profileData.socialMedia.linkedin.trim() !== '' && (
+            <div className={`${theme.card} rounded-2xl p-8 mb-8 animate-slide-up`} style={{animationDelay: '0.4s'}}>
+              <h2 className={`text-2xl font-bold ${theme.text} mb-6 text-center`}>
+                Social Media
+              </h2>
+              <div className="text-center">
+                <a
+                  href={profileData.socialMedia.linkedin.startsWith('http') ? profileData.socialMedia.linkedin : `https://${profileData.socialMedia.linkedin}`}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className={`${theme.button} px-8 py-4 rounded-xl font-medium transition-all duration-300 transform hover:scale-105 hover:shadow-lg inline-flex items-center`}
+                >
+                  <svg className="w-5 h-5 mr-2" fill="currentColor" viewBox="0 0 24 24">
+                    <path d="M20.447 20.452h-3.554v-5.569c0-1.328-.027-3.037-1.852-3.037-1.853 0-2.136 1.445-2.136 2.939v5.667H9.351V9h3.414v1.561h.046c.477-.9 1.637-1.85 3.37-1.85 3.601 0 4.267 2.37 4.267 5.455v6.286zM5.337 7.433c-1.144 0-2.063-.926-2.063-2.065 0-1.138.92-2.063 2.063-2.063 1.14 0 2.064.925 2.064 2.063 0 1.139-.925 2.065-2.064 2.065zm1.782 13.019H3.555V9h3.564v11.452zM22.225 0H1.771C.792 0 0 .774 0 1.729v20.542C0 23.227.792 24 1.771 24h20.451C23.2 24 24 23.227 24 22.271V1.729C24 .774 23.2 0 22.222 0h.003z"/>
+                  </svg>
+                  LinkedIn
+                </a>
+              </div>
+            </div>
+          )}
+
+          {/* Blogs Section - Show even if empty with status message */}
+          <div className={`${theme.card} rounded-3xl p-8 mb-8 animate-slide-up`} style={{animationDelay: '0.5s'}}>
+            <h2 className={`text-3xl font-bold ${theme.text} mb-8 text-center`}>
+              Latest Blogs
+            </h2>
+            
+            {dataLoadingStatus.blogs === 'loading' && (
+              <div className="text-center py-8">
+                <div className={`${theme.text} opacity-60`}>Loading blogs...</div>
+              </div>
+            )}
+            
+            {dataLoadingStatus.blogs === 'error' && (
+              <div className="text-center py-8">
+                <div className={`${theme.text} opacity-60 mb-2`}>Unable to load blogs due to permissions.</div>
+                <div className="text-sm text-red-500">Check your Firestore security rules for the Blogs subcollection.</div>
+              </div>
+            )}
+
+            {dataLoadingStatus.blogs === 'success' && blogs.length === 0 && (
+              <div className="text-center py-8">
+                <div className={`${theme.text} opacity-60`}>No published blogs found.</div>
+              </div>
+            )}
+
+            {blogs && blogs.length > 0 && (
+              <div className="grid gap-6">
+                {blogs.slice(0, 3).map((blog, index) => (
+                  <div key={blog.id} className={`bg-white/20 rounded-2xl p-6 border border-white/30 hover:bg-white/30 transition-all duration-300 group`}>
+                    <div className="flex justify-between items-start mb-4">
+                      <div className="flex-1">
+                        <h3 className={`${theme.text} font-bold text-xl mb-2 group-hover:${theme.accent} transition-colors duration-200`}>
+                          {blog.title}
+                        </h3>
+                        {blog.excerpt && (
+                          <p className={`${theme.text} opacity-70 text-base mb-3 leading-relaxed`}>
+                            {blog.excerpt}
+                          </p>
+                        )}
+                        <div className="flex items-center gap-4 text-sm">
+                          <span className={`${theme.accent} font-medium`}>
+                            {blog.readTime || '5 min read'}
+                          </span>
+                          <span className={`${theme.text} opacity-60`}>
+                            {blog.date || (blog.createdAt?.toDate ? new Date(blog.createdAt.toDate()).toLocaleDateString() : 'No date')}
+                          </span>
+                          {blog.views !== undefined && (
+                            <span className={`${theme.text} opacity-60`}>
+                              {blog.views} views
+                            </span>
+                          )}
+                        </div>
+                      </div>
+                      {blog.featured && (
+                        <div className={`${theme.secondary} px-3 py-1 rounded-full ml-4`}>
+                          <span className={`text-xs font-semibold ${theme.accent}`}>
+                            Featured
+                          </span>
+                        </div>
+                      )}
+                    </div>
+                    
+                    {/* Tags */}
+                    {blog.tags && blog.tags.length > 0 && (
+                      <div className="flex flex-wrap gap-2 mb-4">
+                        {blog.tags.slice(0, 3).map((tag, tagIndex) => (
+                          <span 
+                            key={tagIndex} 
+                            className={`${theme.secondary} px-3 py-1 rounded-full text-xs font-medium ${theme.accent}`}
+                          >
+                            {tag}
+                          </span>
+                        ))}
+                        {blog.tags.length > 3 && (
+                          <span className={`${theme.text} opacity-60 text-xs self-center`}>
+                            +{blog.tags.length - 3} more
+                          </span>
+                        )}
+                      </div>
+                    )}
+                    
+                    {/* Blog content preview */}
+                    {blog.content && (
+                      <p className={`${theme.text} opacity-70 text-sm line-clamp-3`}>
+                        {blog.content.replace(/<[^>]*>/g, '').substring(0, 150)}...
+                      </p>
+                    )}
+                  </div>
+                ))}
+                
+                {blogs.length > 3 && (
+                  <div className="text-center mt-6">
+                    <button className={`${theme.button} px-6 py-3 rounded-xl font-medium transition-all duration-300 transform hover:scale-105`}>
+                      View All {blogs.length} Blogs
+                    </button>
+                  </div>
+                )}
+              </div>
+            )}
+          </div>
+
+          {/* Certificates Section */}
+          {profileData.certificates && profileData.certificates.length > 0 && (
+            <div className={`${theme.card} rounded-2xl p-8 mb-8 animate-slide-up`} style={{animationDelay: '0.6s'}}>
+              <h2 className={`text-2xl font-bold ${theme.text} mb-6 text-center`}>
+                Certificates
+              </h2>
+              <div className="grid md:grid-cols-2 gap-6">
+                {profileData.certificates.map((cert, index) => (
+                  <div key={index} className={`bg-white/20 rounded-lg p-4 border border-white/30`}>
+                    <h3 className={`${theme.text} font-semibold mb-2`}>
+                      {cert.name}
+                    </h3>
+                    {cert.issuer && (
+                      <p className={`${theme.accent} text-sm mb-1`}>
+                        {cert.issuer}
+                      </p>
+                    )}
+                    {cert.date && (
+                      <p className={`${theme.text} opacity-60 text-sm`}>
+                        {cert.date}
+                      </p>
+                    )}
+                  </div>
+                ))}
+              </div>
+            </div>
+          )}
+
+          {/* Footer */}
+          <div className="text-center mt-12 animate-slide-up" style={{animationDelay: '0.7s'}}>
+            <p className={`${theme.text} opacity-50 text-sm`}>
+              Powered by YourApp • Create your own profile
+            </p>
+          </div>
+        </div>
+      </div>
+
+      {/* Floating Action Buttons */}
+      <div className="fixed bottom-8 right-8 flex flex-col space-y-4 z-50">
+        {/* Email Enquiry Button */}
+        <button
+          onClick={handleEnquiryEmail}
+          className={`w-14 h-14 ${theme.fab} text-white rounded-full shadow-2xl transition-all duration-300 transform hover:scale-110 hover:shadow-3xl animate-bounce-in flex items-center justify-center group`}
+          style={{animationDelay: '1s'}}
+          title="Send Enquiry Email"
+        >
+          <svg className="w-6 h-6 transition-transform duration-200 group-hover:scale-110" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 8l7.89 4.26a2 2 0 002.22 0L21 8M5 19h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2z" />
+          </svg>
+        </button>
+
+        {/* Chatbot Button - Only show if chatbot config exists */}
+        {dataLoadingStatus.chatbot === 'success' && chatbotConfig && (
+          <button
+            onClick={() => setShowChatbot(true)}
+            className={`w-14 h-14 ${theme.fab} text-white rounded-full shadow-2xl transition-all duration-300 transform hover:scale-110 hover:shadow-3xl animate-bounce-in flex items-center justify-center group`}
+            style={{animationDelay: '1.2s'}}
+            title="Chat with AI Assistant"
+          >
+            <svg className="w-6 h-6 transition-transform duration-200 group-hover:scale-110" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 10h.01M12 10h.01M16 10h.01M9 16H5a2 2 0 01-2-2V6a2 2 0 012-2h14a2 2 0 012 2v8a2 2 0 01-2 2h-5l-5 5v-5z" />
+            </svg>
+          </button>
+        )}
+      </div>
+
+      {/* Email Enquiry Modal */}
+      {showEnquiryEmail && (
+        <div className="fixed inset-0 bg-black/50 backdrop-blur-sm flex items-center justify-center p-4 z-50 animate-fade-in">
+          <div className={`${theme.card} rounded-2xl p-8 max-w-md w-full animate-scale-in`}>
+            <h3 className={`text-2xl font-bold ${theme.text} mb-4`}>Contact Information</h3>
+            <p className={`${theme.text} opacity-80 mb-4`}>
+              Email information is not available for this profile.
+            </p>
+            <button
+              onClick={() => setShowEnquiryEmail(false)}
+              className={`${theme.button} px-6 py-2 rounded-lg w-full`}
+            >
+              Close
+            </button>
+          </div>
+        </div>
+      )}
+
+      {/* Chatbot Modal */}
+      {showChatbot && (
+        <div className="fixed inset-0 bg-black/50 backdrop-blur-sm flex items-end md:items-center justify-center p-0 md:p-4 z-50 animate-fade-in">
+          <div className={`${theme.card} rounded-t-2xl md:rounded-2xl w-full md:max-w-2xl md:max-h-[80vh] h-full md:h-auto animate-slide-up-mobile md:animate-scale-in overflow-hidden flex flex-col`}>
+            {/* Chatbot Header */}
+            <div className={`${theme.secondary} p-4 flex items-center justify-between border-b border-white/20`}>
+              <div className="flex items-center space-x-3">
+                <div className={`w-10 h-10 ${theme.fab} rounded-full flex items-center justify-center`}>
+                  <svg className="w-5 h-5 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 10h.01M12 10h.01M16 10h.01M9 16H5a2 2 0 01-2-2V6a2 2 0 012-2h14a2 2 0 012 2v8a2 2 0 01-2 2h-5l-5 5v-5z" />
+                  </svg>
+                </div>
+                <div>
+                  <h3 className={`font-semibold ${theme.text}`}>AI Assistant</h3>
+                  <p className={`text-sm ${theme.accent}`}>Ask me anything about {profileData.firstName}</p>
+                </div>
+              </div>
+              <button
+                onClick={() => setShowChatbot(false)}
+                className={`w-8 h-8 ${theme.accent} hover:${theme.text} rounded-full flex items-center justify-center transition-colors duration-200`}
+              >
+                <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+                </svg>
+              </button>
+            </div>
+            
+            {/* Chatbot Content */}
+            <div className="flex-1 overflow-hidden">
+              <Chatbot config={chatbotConfig} messages={messages} setMessages={setMessages} profileData={profileData} theme={theme} />
+            </div>
+          </div>
+        </div>
+      )}
+
+      <style jsx>{`
+        @keyframes fade-in {
+          from { opacity: 0; }
+          to { opacity: 1; }
+        }
+        
+        @keyframes slide-up {
+          from { 
+            opacity: 0;
+            transform: translateY(30px);
+          }
+          to { 
+            opacity: 1;
+            transform: translateY(0);
+          }
+        }
+        
+        @keyframes slide-up-mobile {
+          from { 
+            transform: translateY(100%);
+          }
+          to { 
+            transform: translateY(0);
+          }
+        }
+        
+        @keyframes scale-in {
+          from { 
+            opacity: 0;
+            transform: scale(0.9);
+          }
+          to { 
+            opacity: 1;
+            transform: scale(1);
+          }
+        }
+        
+        @keyframes bounce-in {
+          0% {
+            opacity: 0;
+            transform: scale(0.3) rotate(-180deg);
+          }
+          50% {
+            opacity: 1;
+            transform: scale(1.1) rotate(-90deg);
+          }
+          100% {
+            opacity: 1;
+            transform: scale(1) rotate(0deg);
+          }
+        }
+        
+        .animate-fade-in {
+          animation: fade-in 0.6s ease-out forwards;
+        }
+        
+        .animate-slide-up {
+          animation: slide-up 0.8s ease-out forwards;
+          opacity: 0;
+        }
+        
+        .animate-slide-up-mobile {
+          animation: slide-up-mobile 0.4s ease-out forwards;
+        }
+        
+        .animate-scale-in {
+          animation: scale-in 0.3s ease-out forwards;
+        }
+        
+        .animate-bounce-in {
+          animation: bounce-in 0.8s ease-out forwards;
+          opacity: 0;
+        }
+        
+        .shadow-3xl {
+          box-shadow: 0 25px 50px -12px rgba(0, 0, 0, 0.25);
+        }
+      `}</style>
+    </div>
+  );
+};
+
+export default ProfilePage;
