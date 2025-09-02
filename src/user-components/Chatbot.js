@@ -170,7 +170,7 @@ const Chatbot = ({ config, messages, setMessages, profileData, theme, saveChatbo
   // Function to call Gemini API with enhanced prompting
   const callGeminiAPI = async (userMessage, context) => {
     try {
-      const API_KEY = "AIzaSyDDGsJEgOiELCN4d5ixgDmOJhSJ9RKyWvk";
+      const API_KEY = "";
       
       if (!API_KEY) {
         console.warn('Gemini API key not found in environment variables');
