@@ -1,7 +1,36 @@
 // routes/newsletterRoutes.js
+const nodemailer = require('nodemailer');
+
 module.exports = (db, admin) => {
   const express = require('express');
   const router = express.Router();
+
+  // Create reusable transporter object using the default SMTP transport
+  const createTransporter = () => {
+    return nodemailer.createTransport({
+      service: 'gmail',
+      auth: {
+        user: process.env.EMAIL_USER, // Your Gmail address
+        pass: process.env.EMAIL_PASS  // Your Gmail App Password
+      }
+    });
+  };
+
+  // Alternative configuration for other email providers
+  const createCustomTransporter = () => {
+    return nodemailer.createTransport({
+      host: process.env.SMTP_HOST || 'smtp.gmail.com',
+      port: parseInt(process.env.SMTP_PORT) || 587,
+      secure: process.env.SMTP_SECURE === 'true', // true for 465, false for other ports
+      auth: {
+        user: process.env.EMAIL_USER,
+        pass: process.env.EMAIL_PASS
+      },
+      tls: {
+        rejectUnauthorized: false
+      }
+    });
+  };
 
   // Helper function to validate newsletter configuration
   const validateNewsletterConfig = (config) => {
@@ -25,25 +54,114 @@ module.exports = (db, admin) => {
     return errors;
   };
 
-  // Helper function to send email (mock implementation - replace with real email service)
+  // Updated helper function to send email using Nodemailer
   const sendEmail = async (to, subject, htmlContent, senderName, senderEmail) => {
-    // In production, integrate with email services like:
-    // - SendGrid
-    // - Mailchimp
-    // - AWS SES
-    // - Nodemailer with SMTP
-    
-    console.log(`Mock sending email to: ${to}`);
-    console.log(`From: ${senderName} <${senderEmail}>`);
-    console.log(`Subject: ${subject}`);
-    console.log(`Content length: ${htmlContent.length} characters`);
-    
-    // Simulate network delay
-    await new Promise(resolve => setTimeout(resolve, 100));
-    
-    // Mock success rate (in production, this would be real email delivery)
-    return Math.random() > 0.05; // 95% success rate
+    try {
+      // Validate environment variables
+      if (!process.env.EMAIL_USER || !process.env.EMAIL_PASS) {
+        throw new Error('Email credentials not configured. Please set EMAIL_USER and EMAIL_PASS environment variables.');
+      }
+
+      const transporter = createTransporter();
+
+      console.log("Sending email to ", to);
+
+      // Verify SMTP connection configuration
+      await transporter.verify();
+
+      const mailOptions = {
+        from: {
+          name: senderName,
+          address: process.env.EMAIL_USER // Always use the authenticated email as sender
+        },
+        to: to,
+        subject: subject,
+        html: htmlContent,
+        replyTo: senderEmail, // Allow replies to go to the newsletter owner's email
+        headers: {
+          'X-Mailer': 'Newsletter Service',
+          'X-Priority': '3'
+        }
+      };
+
+      console.log(`Sending email to: ${to} via Nodemailer`);
+      
+      const result = await transporter.sendMail(mailOptions);
+      
+      console.log(`Email sent successfully to ${to}. Message ID: ${result.messageId}`);
+      return true;
+
+    } catch (error) {
+      console.error(`Failed to send email to ${to}:`, error.message);
+      
+      // Log specific error types for debugging
+      if (error.code === 'EAUTH') {
+        console.error('Authentication failed. Check your email credentials.');
+      } else if (error.code === 'ECONNECTION') {
+        console.error('Connection failed. Check your internet connection and SMTP settings.');
+      } else if (error.responseCode === 550) {
+        console.error('Email rejected by recipient server. The email address may be invalid.');
+      }
+      
+      return false;
+    }
   };
+
+  // Test email configuration endpoint
+  router.post('/:userId/test-email-config', async (req, res) => {
+    const { userId } = req.params;
+    const { testEmail } = req.body;
+
+    try {
+      if (!testEmail || !testEmail.includes('@')) {
+        return res.status(400).json({
+          success: false,
+          message: 'Valid test email address is required'
+        });
+      }
+
+      console.log(`Testing email configuration for user: ${userId}`);
+
+      const testSubject = 'Newsletter System - Configuration Test';
+      const testContent = `
+        <div style="font-family: Arial, sans-serif; padding: 20px;">
+          <h2>Email Configuration Test</h2>
+          <p>This is a test email to verify that your newsletter email configuration is working correctly.</p>
+          <p><strong>Test successful!</strong> Your newsletter system is ready to send emails.</p>
+          <hr>
+          <p style="color: #666; font-size: 12px;">This test was initiated from your newsletter dashboard.</p>
+        </div>
+      `;
+
+      const success = await sendEmail(
+        testEmail,
+        testSubject,
+        testContent,
+        'Newsletter System',
+        testEmail
+      );
+
+      if (success) {
+        res.json({
+          success: true,
+          message: `Test email sent successfully to ${testEmail}`
+        });
+      } else {
+        res.status(500).json({
+          success: false,
+          message: 'Failed to send test email. Please check your email configuration.'
+        });
+      }
+
+    } catch (error) {
+      console.error(`Error testing email config for user ${userId}:`, error);
+      res.status(500).json({
+        success: false,
+        message: 'Failed to test email configuration',
+        error: error.message
+      });
+    }
+  });
 
   // Helper function to generate newsletter HTML template
   const generateNewsletterHTML = (config, theme) => {
@@ -141,6 +259,15 @@ module.exports = (db, admin) => {
             .unsubscribe {
                 color: ${themeColors.accent};
                 text-decoration: none;
+            }
+            @media only screen and (max-width: 600px) {
+                .container {
+                    width: 100% !important;
+                    margin: 0 !important;
+                }
+                .header, .content {
+                    padding: 20px !important;
+                }
             }
         </style>
     </head>
@@ -372,8 +499,8 @@ module.exports = (db, admin) => {
 
       console.log(`Sending newsletter to ${recipients.length} recipients...`);
       
-      // Send emails in batches to avoid overwhelming the email service
-      const batchSize = 50;
+      // Send emails in smaller batches to avoid rate limits
+      const batchSize = 10; // Reduced batch size for Gmail
       for (let i = 0; i < recipients.length; i += batchSize) {
         const batch = recipients.slice(i, i + batchSize);
         
@@ -406,14 +533,14 @@ module.exports = (db, admin) => {
         
         await Promise.all(batchPromises);
         
-        // Small delay between batches
+        // Longer delay between batches to respect Gmail rate limits
         if (i + batchSize < recipients.length) {
-          await new Promise(resolve => setTimeout(resolve, 500));
+          console.log(`Batch ${Math.floor(i/batchSize) + 1} completed. Waiting before next batch...`);
+          await new Promise(resolve => setTimeout(resolve, 2000)); // 2 second delay
         }
       }
 
       // Record newsletter send in database
-      // Fixed: Use 'NewsletterSends' collection instead of nested collection
       const sendRecord = {
         userId,
         subject,
@@ -455,7 +582,6 @@ module.exports = (db, admin) => {
     try {
       console.log(`Fetching newsletter history for user: ${userId}`);
       
-      // Fixed: Query from 'NewsletterSends' collection and filter by userId
       let query = db.collection('NewsletterSends').where('userId', '==', userId);
       
       // Apply ordering and limit

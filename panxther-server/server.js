@@ -68,7 +68,9 @@ app.get('/', (req, res) => {
       "DELETE /api/users/:id": "Delete user and profile",
       "DELETE /api/users/:id/profile": "Delete user profile only",
       "POST /api/users/bulk-create": "Bulk create users",
-      "GET /api/admin/stats": "Get user statistics"
+      "GET /api/admin/stats": "Get user statistics",
+      "GET /api/users/:userId/analytics": "Get user analytics",
+      "GET /api/users/:userId/settings/refs": "Get user refs"
     }
   });
 });
@@ -80,6 +82,9 @@ const chatbotRoutes = require('./routes/chatbotRoutes')(db, admin);
 const blogRoutes = require('./routes/blogRoutes')(db, admin);
 const newsletterRoutes = require('./routes/newsletterRoutes')(db, admin);
 const publicProfileRoutes = require('./routes/publicProfileRoutes')(db, admin);
+const dashboardRoutes = require('./routes/dashboardRoutes')(db, admin);
+
+
 
 // Mount route modules
 app.use('/api/users', imageRoutes);
@@ -88,6 +93,7 @@ app.use('/api/users', chatbotRoutes);
 app.use('/api/users', blogRoutes);
 app.use('/api/users', newsletterRoutes);
 app.use('/api/users', publicProfileRoutes);
+app.use('/api/admin', dashboardRoutes);
 
 // GET user statistics (admin endpoint)
 app.get('/api/admin/stats', async (req, res) => {

@@ -1,27 +1,38 @@
 import React, { useState, useEffect, useRef } from 'react';
 
-const Chatbot = ({ config, messages, setMessages, profileData, theme }) => {
+const Chatbot = ({ config, messages, setMessages, profileData, theme, saveChatbotLead }) => {
+
+  // saveChatbotLead - > saveChatbotLead(leadEmail) : Call to save lead email to backend
   
   const [inputValue, setInputValue] = useState('');
   const [isTyping, setIsTyping] = useState(false);
   const [isLoading, setIsLoading] = useState(false);
   const [currentFlow, setCurrentFlow] = useState(null);
+  const [emailCaptured, setEmailCaptured] = useState(false);
+  const [awaitingEmail, setAwaitingEmail] = useState(false);
+  const [messageCount, setMessageCount] = useState(0);
+  const [salesEnquiryComplete, setSalesEnquiryComplete] = useState(false);
+  const [userEngagement, setUserEngagement] = useState('low'); // Track engagement level
   const messagesEndRef = useRef(null);
   const inputRef = useRef(null);
 
   // Extract config data
-  const { faqs = [], wikiEntries = [], behaviorFlow = [], userInfo = {}, enabled = false } = config || {};
+  const { faqs = [], wikiEntries = [], behaviorFlow = [], selectedMode = "", userInfo = {}, enabled = false } = config || {};
+
+  // Determine if we're in sales mode using selectedMode
+  const isSalesMode = selectedMode === "SALES";
+  const isFaqMode = selectedMode === "FAQ";
 
   // Generate quick actions based on config
   const generateQuickActions = () => {
     const actions = [];
     
-    // Add FAQ questions as quick actions
+    // Add FAQ questions as quick actions (limit to 3 most relevant)
     faqs.slice(0, 3).forEach(faq => {
       actions.push(faq.question);
     });
     
-    // Add common insurance questions
+    // Add service-specific questions
     if (userInfo.primaryServices === 'insurance') {
       actions.push("Get a quote", "What coverage do you offer?", "How do I file a claim?");
     }
@@ -47,8 +58,13 @@ const Chatbot = ({ config, messages, setMessages, profileData, theme }) => {
     if (messages.length === 0 && enabled) {
       // Use the first behavior flow greeting or default
       const greetingFlow = behaviorFlow.find(flow => flow.trigger === 'greeting');
-      const welcomeText = greetingFlow?.response || 
-        `Hi! I'm ${userInfo.businessName || profileData?.firstName || 'your'}'s AI assistant specializing in ${userInfo.primaryServices || 'services'}. How can I help you today?`;
+      let welcomeText = greetingFlow?.response || 
+        `Hi there! I'm here to help you with ${userInfo.businessName || profileData?.firstName || 'our'} ${userInfo.primaryServices || 'services'}. What can I assist you with today?`;
+      
+      // More natural email prompt for FAQ mode
+      if (isFaqMode && !emailCaptured) {
+        welcomeText += "\n\nBy the way, if you'd like me to send you some helpful resources later, just let me know your email when you're ready!";
+      }
       
       const welcomeMessage = {
         id: Date.now(),
@@ -58,23 +74,112 @@ const Chatbot = ({ config, messages, setMessages, profileData, theme }) => {
       };
       setMessages([welcomeMessage]);
     }
-  }, [config, messages.length, setMessages, enabled, behaviorFlow, userInfo, profileData]);
+  }, [config, messages.length, setMessages, enabled, behaviorFlow, userInfo, profileData, isFaqMode, emailCaptured]);
 
-  // Function to call Gemini API
+  // Email validation function
+  const isValidEmail = (email) => {
+    const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+    return emailRegex.test(email);
+  };
+
+  // Check if message contains email
+  const extractEmail = (text) => {
+    const emailRegex = /\b[A-Za-z0-9._%+-]+@[A-Za-z0-9.-]+\.[A-Z|a-z]{2,}\b/g;
+    const matches = text.match(emailRegex);
+    return matches ? matches[0] : null;
+  };
+
+  // Enhanced engagement tracking
+  const updateEngagementLevel = (userMessage) => {
+    const engagementKeywords = {
+      high: ['interested', 'definitely', 'sounds great', 'perfect', 'exactly', 'yes', 'absolutely'],
+      medium: ['maybe', 'possibly', 'considering', 'thinking about', 'tell me more'],
+      low: ['not sure', 'maybe later', 'just looking', 'browsing']
+    };
+    
+    const messageLower = userMessage.toLowerCase();
+    
+    if (engagementKeywords.high.some(word => messageLower.includes(word))) {
+      setUserEngagement('high');
+    } else if (engagementKeywords.medium.some(word => messageLower.includes(word))) {
+      setUserEngagement('medium');
+    }
+  };
+
+  // Handle email capture with more natural responses
+  const handleEmailCapture = async (email) => {
+    console.log('Attempting to capture email:', email);
+    try {
+      await saveChatbotLead(email);
+      setEmailCaptured(true);
+      setAwaitingEmail(false);
+      return true;
+    } catch (error) {
+      console.error('Error saving lead email:', error);
+      return false;
+    }
+  };
+
+  // Enhanced sales enquiry completion detection
+  const checkSalesEnquiryComplete = (userMessage, botResponse) => {
+  const completionKeywords = [
+    'thank you', 'thanks', 'that helps', 'perfect', 'great',
+    'sounds good', 'i\'ll think about it', 'let me consider'
+  ];
+  
+  const progressKeywords = [
+    'how much', 'cost', 'price', 'quote', 'coverage', 'premium',
+    'interested', 'want', 'need', 'looking for'
+  ];
+  
+  const userLower = userMessage.toLowerCase();
+  
+  const showingProgress = progressKeywords.some(keyword => userLower.includes(keyword));
+  const showingCompletion = completionKeywords.some(keyword => userLower.includes(keyword));
+  
+  // Trigger email capture after showing interest (not just completion)
+  return (showingProgress || showingCompletion) && messageCount >= 2;
+};
+
+  // Enhanced paraphrasing function for FAQ responses
+  const paraphraseFAQResponse = (faqAnswer, userQuestion, context = {}) => {
+    const conversationalStarters = [
+      "Great question! ",
+      "I'm happy to help with that. ",
+      "Absolutely! ",
+      "Here's what I can tell you about that: ",
+      "That's something we get asked often. "
+    ];
+    
+    const starter = conversationalStarters[Math.floor(Math.random() * conversationalStarters.length)];
+    
+    // Add context-aware modifications
+    let paraphrased = faqAnswer;
+    
+    // Make it more conversational by replacing formal language
+    paraphrased = paraphrased
+      .replace(/^Our company/, `${userInfo.businessName || 'We'}`)
+      .replace(/We provide/, "What we do is provide")
+      .replace(/Please contact us/, "Feel free to reach out")
+      .replace(/It is important to note/, "Just so you know")
+      .replace(/Furthermore/, "Also");
+    
+    return starter + paraphrased;
+  };
+
+  // Function to call Gemini API with enhanced prompting
   const callGeminiAPI = async (userMessage, context) => {
     try {
-      const API_KEY = process.env.PANXTHER_GEMINI_API_KEY || process.env.PANXTHER_GEMINI_API_KEY;
+      const API_KEY = "AIzaSyDDGsJEgOiELCN4d5ixgDmOJhSJ9RKyWvk";
       
-      // Check if API key exists
       if (!API_KEY) {
         console.warn('Gemini API key not found in environment variables');
         throw new Error('API key not configured');
       }
       
-      // Correct Gemini API URL
       const API_URL = `https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key=${API_KEY}`;
       
-      // Build context from config
+      // Build enhanced context from config
       const businessContext = `
 Business Information:
 - Name: ${userInfo.businessName || 'N/A'}
@@ -83,6 +188,10 @@ Business Information:
 - Target Audience: ${userInfo.targetAudience || 'N/A'}
 - Unique Selling Points: ${userInfo.uniqueSellingPoints || 'N/A'}
 - Description: ${userInfo.description || 'N/A'}
+
+Mode: ${selectedMode || 'General'}
+User Engagement Level: ${userEngagement}
+Messages Exchanged: ${messageCount}
 
 Available FAQs:
 ${faqs.length > 0 ? faqs.map(faq => `Q: ${faq.question}\nA: ${faq.answer}`).join('\n\n') : 'No FAQs available'}
@@ -94,23 +203,40 @@ Behavior Guidelines:
 ${behaviorFlow.length > 0 ? behaviorFlow.map(flow => `When ${flow.condition || flow.trigger}: ${flow.response}`).join('\n') : 'Use general helpful responses'}
       `;
 
-      const prompt = `You are a professional AI assistant representing ${userInfo.businessName || 'this business'}. 
+      // Enhanced email capture context based on mode and engagement
+      let emailContext = '';
+      if (isSalesMode && !emailCaptured) {
+        if (userEngagement === 'high' && messageCount >= 2) {
+          emailContext = '\nNote: User seems highly engaged. This is SALES mode - suggest email sharing for personalized follow-up and detailed information.';
+        } else if (messageCount >= 3) {
+          emailContext = '\nNote: This is SALES mode. If the conversation is progressing well, naturally suggest email sharing for follow-up.';
+        }
+      } else if (isFaqMode && !emailCaptured && messageCount > 1 && messageCount % 3 === 0) {
+        emailContext = '\nNote: This is FAQ mode. Occasionally and naturally suggest the user can share their email for additional resources or follow-up.';
+      }
 
-${businessContext}
+      const prompt = `You are a friendly, professional AI assistant representing ${userInfo.businessName || 'this business'} in ${selectedMode || 'general'} mode. 
 
-Current conversation context: ${context}
-User's question: "${userMessage}"
+      ${businessContext}
 
-Instructions:
-1. Respond as a knowledgeable representative of ${userInfo.businessName || 'the business'}
-2. Use the FAQs to provide direct answers when relevant
-3. Reference knowledge base information when applicable
-4. Stay professional and focused on ${userInfo.primaryServices || 'business services'}
-5. If unsure, recommend contacting the business directly
-6. Keep responses helpful but concise (2-3 sentences max)
-7. Be friendly and conversational
+      Current conversation context: ${context}
+      User's question: "${userMessage}"
+      ${emailContext}
 
-Please provide a helpful response:`;
+      CRITICAL INSTRUCTIONS:
+      1. Always PARAPHRASE information from FAQs and knowledge base - never copy directly. Fix spelling errors and make it sound natural.
+      2. Use a warm, conversational tone that feels natural and human-like
+      3. When referencing FAQ content, rephrase it to sound like you're personally explaining it
+      4. Make responses feel personalized to ${userInfo.businessName || 'the business'}
+      5. ${isSalesMode ? 'Focus on building interest and naturally guiding toward email capture when appropriate' : 'Focus on being helpful and informative'}
+      6. Keep responses concise but conversational (2-3 sentences max)
+      7. Use natural conversation starters like "Great question!", "I'd be happy to help!", etc.
+      8. If using knowledge base info, weave it naturally into your response rather than stating it directly
+      9. Match the user's tone and energy level
+      10. If you find youself or the user repeating the same info, guide toward email capture for more detailed follow-up
+      11. ${emailContext ? 'If the moment feels right, naturally suggest email sharing without being pushy' : ''}
+
+      Please provide a helpful, natural response that sounds like a real person talking:`;
 
       const requestBody = {
         contents: [{
@@ -119,7 +245,7 @@ Please provide a helpful response:`;
           }]
         }],
         generationConfig: {
-          temperature: 0.7,
+          temperature: 0.8, // Increased for more natural responses
           topK: 40,
           topP: 0.95,
           maxOutputTokens: 512,
@@ -176,7 +302,6 @@ Please provide a helpful response:`;
       const data = await response.json();
       console.log('Gemini API Response:', data);
       
-      // Check if the response has the expected structure
       if (!data.candidates || !data.candidates[0]) {
         console.error('No candidates in API response:', data);
         throw new Error('Invalid response structure from API');
@@ -199,106 +324,181 @@ Please provide a helpful response:`;
     } catch (error) {
       console.error('Gemini API Error:', error);
       
-      // Return different messages based on error type
+      // More conversational error messages
       if (error.message.includes('API key')) {
-        return "I'm currently unavailable due to configuration issues. Please contact us directly for assistance.";
+        return "I'm having some technical difficulties right now. Could you try contacting us directly? We'd love to help!";
       } else if (error.message.includes('quota')) {
-        return "I'm temporarily unavailable due to high demand. Please try again later or contact us directly.";
-      } else if (error.message.includes('404') || error.message.includes('model not found')) {
-        return "I'm experiencing technical difficulties with my AI service. Please contact us directly for help.";
-      } else if (error.message.includes('400') || error.message.includes('Invalid request')) {
-        return "I had trouble understanding that request. Could you please rephrase your question?";
+        return "I'm getting a lot of questions today! While I sort this out, feel free to reach out to us directly.";
       } else {
-        return "I'm having temporary connectivity issues. Please try again in a moment or contact us directly.";
+        return "Hmm, I seem to be having a small technical hiccup. Could you try asking that again, or reach out to us directly?";
       }
     }
   };
 
   const generateBotResponse = async (userMessage) => {
-    // If chatbot is disabled, return a simple message
-    if (!enabled) {
-      return "The chatbot is currently offline. Please contact us directly for assistance.";
-    }
+  updateEngagementLevel(userMessage);
 
-    const message = userMessage.toLowerCase().trim();
-    
-    // Check for direct FAQ matches first
-    const matchedFAQ = faqs.find(faq => {
-      const faqLower = faq.question.toLowerCase();
-      return message.includes(faqLower) || 
-             faqLower.includes(message) ||
-             message.split(' ').some(word => word.length > 3 && faqLower.includes(word));
-    });
-    
-    if (matchedFAQ) {
-      return matchedFAQ.answer;
-    }
+  if (!enabled) {
+    return "I'm currently offline, but we'd love to help! Please contact us directly for assistance.";
+  }
 
-    // Check behavior flows
-    let matchedFlow = null;
-    
-    // Check for greeting patterns
-    const greetingWords = ['hello', 'hi', 'hey', 'good morning', 'good afternoon', 'good evening'];
-    if (greetingWords.some(greeting => message.includes(greeting))) {
-      matchedFlow = behaviorFlow.find(flow => flow.trigger === 'greeting' || flow.trigger === 'hello');
+  const message = userMessage.toLowerCase().trim();
+  
+  // Handle email capture
+  const emailInMessage = extractEmail(userMessage);
+  if (emailInMessage && !emailCaptured) {
+    const emailSaved = await handleEmailCapture(emailInMessage);
+    if (emailSaved) {
+      return `Perfect! I've got your email (${emailInMessage}). Our team will reach out soon with personalised options.`;
+    } else {
+      return `Thanks for sharing your email! I had a small technical issue saving it, but don't worry - our team will still follow up with you.`;
     }
-    
-    // Check for quote requests
-    const quoteWords = ['quote', 'price', 'cost', 'how much', 'pricing', 'estimate'];
-    if (quoteWords.some(word => message.includes(word))) {
-      matchedFlow = behaviorFlow.find(flow => flow.trigger === 'quote_request' || flow.trigger === 'pricing');
-    }
-    
-    // Check for contact requests
-    const contactWords = ['contact', 'reach', 'phone', 'email', 'address'];
-    if (contactWords.some(word => message.includes(word))) {
-      matchedFlow = behaviorFlow.find(flow => flow.trigger === 'contact' || flow.trigger === 'contact_info');
-    }
-    
-    if (matchedFlow) {
-      setCurrentFlow(matchedFlow);
-      return matchedFlow.response;
-    }
+  }
 
-    // Check wiki entries for relevant content
-    const relevantWikiEntry = wikiEntries.find(entry => {
-      const titleLower = entry.title.toLowerCase();
-      const contentLower = entry.content.toLowerCase();
-      const tags = entry.tags || [];
+  // Enhanced FAQ matching with better relevance scoring
+  const matchedFAQ = faqs.find(faq => {
+    const faqLower = faq.question.toLowerCase();
+    const messageLower = message.toLowerCase();
+    
+    // Improved matching logic
+    const faqWords = faqLower.split(' ').filter(word => word.length > 3);
+    const messageWords = messageLower.split(' ').filter(word => word.length > 3);
+    
+    const overlap = faqWords.filter(word => messageWords.includes(word)).length;
+    const overlapPercentage = overlap / Math.max(faqWords.length, messageWords.length);
+    
+    return overlapPercentage > 0.4 || // Increased threshold for better precision
+           (messageLower.includes(faqLower) && faqLower.length > 5) ||
+           (faqLower.includes(messageLower) && messageLower.length > 5);
+  });
+  
+  if (matchedFAQ) {
+    let response = paraphraseFAQResponse(matchedFAQ.answer, userMessage, { mode: selectedMode });
+    
+    // Add contextual follow-up questions
+    if (isSalesMode && !emailCaptured && messageCount >= 1) {
+      response += "\n\nWould you like me to have someone from our team reach out with more detailed information? Just share your email address!";
+    }
+    
+    return response;
+  }
+
+  // Enhanced behavior flow matching with insurance-specific patterns
+  let matchedFlow = null;
+  
+  // Insurance-specific quote patterns
+  const quotePatterns = [
+    /how much/i, /cost/i, /price/i, /quote/i, /premium/i, /rate/i,
+    /\$/, /dollar/i, /cheap/i, /affordable/i, /expensive/i
+  ];
+  
+  const insuranceTypes = [
+    /life insurance/i, /health insurance/i, /auto insurance/i, /car insurance/i,
+    /home insurance/i, /business insurance/i, /travel insurance/i
+  ];
+  
+  if (quotePatterns.some(pattern => pattern.test(message))) {
+    matchedFlow = behaviorFlow.find(flow => 
+      flow.trigger === 'quote_request' || 
+      flow.trigger === 'pricing' ||
+      flow.condition?.toLowerCase().includes('quote')
+    );
+  }
+  
+  // Check for specific insurance type mentions
+  const mentionedInsuranceType = insuranceTypes.find(pattern => pattern.test(message));
+  if (mentionedInsuranceType && !matchedFAQ) {
+    // Generate insurance-specific response
+    const insuranceType = message.match(mentionedInsuranceType)[0];
+    let response = `Great choice! ${insuranceType} is really important for your financial security. `;
+    
+    if (message.includes('how much') || message.includes('cost') || message.includes('price')) {
+      response += `To give you an accurate quote for ${insuranceType}, I'll need a few details. `;
       
-      return message.includes(titleLower) ||
-             titleLower.includes(message) ||
-             contentLower.includes(message) ||
-             tags.some(tag => message.includes(tag.toLowerCase())) ||
-             message.split(' ').some(word => word.length > 3 && (titleLower.includes(word) || contentLower.includes(word)));
-    });
-    
-    if (relevantWikiEntry) {
-      return `Here's what I know about ${relevantWikiEntry.title}: ${relevantWikiEntry.content}`;
+      if (isSalesMode && messageCount >= 1) {
+        response += `Would you like me to have one of our insurance specialists reach out to you with personalized options? Just share your email address!`;
+        setAwaitingEmail(true);
+      }
+    } else {
+      response += `What specific aspects of ${insuranceType} would you like to know about?`;
     }
-
-    // Use Gemini API for more complex responses
-    const context = currentFlow ? `Current conversation flow: ${currentFlow.trigger}` : 'General inquiry';
     
-    try {
-      const geminiResponse = await callGeminiAPI(userMessage, context);
-      return geminiResponse;
-    } catch (error) {
-      console.error('Error in generateBotResponse:', error);
+    return response;
+  }
+
+  if (matchedFlow) {
+    setCurrentFlow(matchedFlow);
+    let response = matchedFlow.response;
+    
+    // Add sales-specific email capture for quote requests
+    if (isSalesMode && (matchedFlow.trigger === 'quote_request' || matchedFlow.trigger === 'pricing') && !emailCaptured) {
+      response += "\n\nI'd love to have one of our specialists put together a personalized quote for you. Could you share your email address so they can follow up?";
+      setAwaitingEmail(true);
+    }
+    
+    return response;
+  }
+
+  // Use Gemini API with improved prompting
+  const context = `
+Current conversation context:
+- User engagement: ${userEngagement}
+- Message count: ${messageCount}
+- Sales mode: ${isSalesMode}
+- Email captured: ${emailCaptured}
+- Awaiting email: ${awaitingEmail}
+- Previous flow: ${currentFlow?.trigger || 'none'}
+`;
+  
+  try {
+    const geminiResponse = await callGeminiAPI(userMessage, context);
+    let finalResponse = geminiResponse;
+    
+    // Strategic email capture for sales mode
+    if (isSalesMode && !emailCaptured && messageCount >= 2) {
+      const hasInterest = /interested|want|need|looking for|tell me about|how much|cost|price|quote/i.test(userMessage);
       
-      // Fallback responses based on keywords
-      if (contactWords.some(word => message.includes(word))) {
-        return `You can contact ${userInfo.businessName || 'us'} directly. Check the contact information on the profile page or call for immediate assistance.`;
+      if (hasInterest) {
+        setAwaitingEmail(true);
+        finalResponse += "\n\nI'd love to connect you with one of our insurance specialists who can give you personalized recommendations. Could you share your email address?";
+      }
+    }
+    
+    return finalResponse;
+    
+  } catch (error) {
+    console.error('Error in generateBotResponse:', error);
+    
+    // Better fallback responses for insurance context
+    if (message.includes('insurance') || message.includes('coverage') || message.includes('policy')) {
+      let response = `I'd be happy to help you with insurance! We offer comprehensive coverage options designed to protect what matters most to you. `;
+      
+      if (message.includes('how much') || message.includes('cost') || message.includes('price')) {
+        response += `For accurate pricing, I'll need to understand your specific needs better. `;
+        
+        if (isSalesMode && !emailCaptured) {
+          response += `Would you like one of our insurance experts to reach out with personalized quotes? Just share your email address!`;
+          setAwaitingEmail(true);
+        }
+      } else {
+        response += `What type of insurance coverage are you most interested in?`;
       }
       
-      if (message.includes('service') || message.includes('offer') || message.includes('do')) {
-        return `${userInfo.businessName || 'We'} specialize in ${userInfo.primaryServices || 'professional services'}. ${userInfo.description || 'We\'re here to help with your needs.'} Would you like to know more about any specific service?`;
-      }
-      
-      // Default fallback
-      return `Thank you for your question! ${userInfo.businessName || 'We'} would be happy to help you with ${userInfo.primaryServices || 'your needs'}. For detailed information, please contact us directly or let me know if you have any specific questions I can help with.`;
+      return response;
     }
-  };
+    
+    // Generic fallback
+    let response = `Thanks for reaching out! I'm here to help you with all your insurance needs. `;
+    
+    if (isSalesMode && !emailCaptured && messageCount >= 1) {
+      response += `To give you the best assistance, would you like me to have one of our specialists reach out? Just share your email address!`;
+    } else {
+      response += `What specific information can I help you with today?`;
+    }
+    
+    return response;
+  }
+};
 
   const handleSend = async () => {
     if (!inputValue.trim() || isLoading) return;
@@ -315,6 +515,7 @@ Please provide a helpful response:`;
     setInputValue('');
     setIsLoading(true);
     setIsTyping(true);
+    setMessageCount(prev => prev + 1);
 
     try {
       const botResponseText = await generateBotResponse(messageToSend);
@@ -339,7 +540,7 @@ Please provide a helpful response:`;
       
       const errorMessage = {
         id: Date.now() + 1,
-        text: "I'm sorry, I'm having trouble responding right now. Please try again or contact us directly.",
+        text: "Oops, I'm having a bit of trouble right now. Could you try again, or feel free to contact us directly - we'd love to help!",
         sender: 'bot',
         timestamp: new Date(),
         isError: true
@@ -388,6 +589,21 @@ Please provide a helpful response:`;
     <div className="flex flex-col h-full max-h-[700px]">
       {/* Messages Container */}
       <div className="flex-1 overflow-y-auto p-4 space-y-4 bg-gradient-to-b from-transparent to-black/5 chatbot-messages">
+        {/* Mode Indicator */}
+        {selectedMode && (
+          <div className="text-center mb-4">
+            <span className={`inline-flex items-center px-3 py-1 rounded-full text-xs font-medium ${
+              isSalesMode 
+                ? 'bg-green-100 text-green-800' 
+                : isFaqMode 
+                ? 'bg-blue-100 text-blue-800' 
+                : 'bg-gray-100 text-gray-800'
+            }`}>
+              {selectedMode} Mode {userEngagement !== 'low' && isSalesMode && `• ${userEngagement} engagement`}
+            </span>
+          </div>
+        )}
+
         {/* Quick Actions - Show only initially */}
         {messages.length <= 1 && quickActions.length > 0 && (
           <div className="mb-4">
@@ -538,6 +754,15 @@ Please provide a helpful response:`;
           <p className="text-xs text-orange-600 mt-2 font-medium">
             {500 - inputValue.length} characters remaining
           </p>
+        )}
+        
+        {/* Engagement indicator for sales mode */}
+        {isSalesMode && userEngagement !== 'low' && messageCount > 1 && !emailCaptured && (
+          <div className="flex items-center justify-center mt-2">
+            <span className="text-xs text-green-600 font-medium bg-green-50 px-2 py-1 rounded-full">
+              Great conversation! 🎯
+            </span>
+          </div>
         )}
       </div>
 

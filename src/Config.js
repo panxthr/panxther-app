@@ -4,6 +4,7 @@ import ProfileDashboard from "./admin-components/ProfileDashboard";
 import ChatbotConfig from "./admin-components/ChatbogConfig";
 import BlogConfig from "./admin-components/BlogConfig";
 import NewsletterCondfig from "./admin-components/NewsletterConfig";
+import StatsDashboard from "./admin-components/StatsDashboard";
 import "./Config.css";
 import { ShaderGradientCanvas, ShaderGradient } from "@shadergradient/react";
 
@@ -11,9 +12,9 @@ import { ShaderGradientCanvas, ShaderGradient } from "@shadergradient/react";
 
 export default function Config() {
   const [darkMode, setDarkMode] = useState(true);
-  const [dashboardpage, setDashboardPage] = useState("profile");
+  const [dashboardpage, setDashboardPage] = useState("stats");
   const [isTransitioning, setIsTransitioning] = useState(false);
-  const [displayedPage, setDisplayedPage] = useState("profile");
+  const [displayedPage, setDisplayedPage] = useState("stats");
   const [userId, setUserId] = useState("user_12345"); // Example user ID
   const [isLoading, setIsLoading] = useState(false);
 
@@ -135,6 +136,15 @@ export default function Config() {
             setUserProfileData={setProfileData}
           />
         );
+      case "stats":
+        return (
+          <StatsDashboard 
+            darkMode={darkMode} 
+            setDarkMode={setDarkMode} 
+            setDashboardPage={setDashboardPage}
+            userId={userId}
+          />
+        );
       case "chatbot":
         return (
           <ChatbotConfig
@@ -179,15 +189,14 @@ export default function Config() {
     <div className={darkMode ? "dark" : ""}>
       <div className="flex h-screen font-sans overflow-hidden relative" style={{ fontFamily: 'Poppins, system-ui, -apple-system, sans-serif' }}>
         {/* Shader-like Gradient Background */}
-        <div className="absolute inset-0 bg-zinc-900">
+        <div className="absolute inset-0 bg-neutral-950">
           {/* Animated gradient base */}
           <div className="absolute inset-0 opacity-80">
-            <div className="absolute opacity-30 inset-0 bg-gradient-to-br from-yellow-900/40 via-orange-800/30 to-red-900/20"></div>
+            <div className="absolute opacity-30 inset-0 bg-zinc-950"></div>
           </div>
           
           {/* Multiple blurred light sources for shader effect */}
-          <div className="absolute top-1/2 right-1/4 w-80 h-80 bg-orange-500/25 rounded-full blur-3xl"></div>
-          <div className="absolute top-1/3 right-1/5 w-64 h-64 bg-yellow-300/20 rounded-full blur-3xl"></div>
+
         </div>
 
         {/* Content over gradient */}

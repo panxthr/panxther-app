@@ -370,6 +370,8 @@ function NewsletterConfig({ darkMode = true, userId = 'user_12345' }) {
     try {
       setSending(true);
       setError('');
+
+      console.log('Sending newsletter with data:', { subject, testMode, sendTheme });
       
       const response = await fetch(`${API_BASE_URL}/${userId}/send-newsletter`, {
         method: 'POST',
